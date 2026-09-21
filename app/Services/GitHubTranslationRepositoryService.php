@@ -26,7 +26,7 @@ class GitHubTranslationRepositoryService
 
     public function fetchPot(?string $ref = null): string
     {
-        $repository = (string) config('torrent.github.repository');
+        $repository = $this->sourceRepository();
         $path = (string) config('torrent.github.pot_path');
         $ref = $ref ?: (string) config('torrent.github.source_ref');
 
@@ -46,11 +46,12 @@ class GitHubTranslationRepositoryService
 
     public function openTranslationPullRequests(array $localeCodes, ?string $base = null): array
     {
-        $repository = (string) config('torrent.github.repository');
+        $pullRequestRepository = $this->pullRequestRepository();
+        $publishRepository = $this->publishRepository();
         $base = $base ?: (string) config('torrent.github.publish_base');
 
         $response = $this->client()->get(
-            "https://api.github.com/repos/{$repository}/pulls",
+            "https://api.github.com/repos/{$pullRequestRepository}/pulls",
             [
                 'state' => 'open',
                 'base' => $base,
@@ -78,14 +79,15 @@ class GitHubTranslationRepositoryService
             $branch = (string) data_get($pr, 'head.ref', '');
             $headRepo = (string) data_get($pr, 'head.repo.full_name', '');
 
-            if ($branch === '' || ($headRepo !== '' && strcasecmp($headRepo, $repository) !== 0)) {
+            if ($branch === '' || ($headRepo !== '' && strcasecmp($headRepo, $publishRepository) !== 0)) {
                 continue;
             }
 
             foreach ($wanted as $normalized => $original) {
-                $prefix = 'translations/'.$normalized;
+                $stableBranch = 'translations/'.$normalized;
+                $timestampPattern = '/^'.preg_quote($stableBranch, '/').'-\\d{8}-\\d{6}$/';
 
-                if ($branch !== $prefix && ! str_starts_with($branch, $prefix.'-')) {
+                if ($branch !== $stableBranch && preg_match($timestampPattern, $branch) !== 1) {
                     continue;
                 }
 
@@ -113,7 +115,8 @@ class GitHubTranslationRepositoryService
         string $webCatalogContents,
         ?string $base = null
     ): array {
-        $repository = (string) config('torrent.github.repository');
+        $publishRepository = $this->publishRepository();
+        $pullRequestRepository = $this->pullRequestRepository();
         $base = $base ?: (string) config('torrent.github.publish_base');
 
         $existingPr = $this->openTranslationPullRequests([$localeCode], $base)[$localeCode] ?? null;
@@ -123,7 +126,7 @@ class GitHubTranslationRepositoryService
             $created = false;
         } else {
             $refResponse = $this->client()->get(
-                "https://api.github.com/repos/{$repository}/git/ref/heads/".rawurlencode($base)
+                "https://api.github.com/repos/{$pullRequestRepository}/git/ref/heads/".rawurlencode($base)
             );
 
             if (! $refResponse->successful()) {
@@ -137,7 +140,7 @@ class GitHubTranslationRepositoryService
             $branch = 'translations/'.strtolower($localeCode).'-'.now()->format('Ymd-His');
 
             $createRef = $this->client()->post(
-                "https://api.github.com/repos/{$repository}/git/refs",
+                "https://api.github.com/repos/{$publishRepository}/git/refs",
                 ['ref' => 'refs/heads/'.$branch, 'sha' => $baseSha]
             );
 
@@ -155,7 +158,7 @@ class GitHubTranslationRepositoryService
         $webLocalesPath = rtrim((string) config('torrent.github.web_locales_path'), '/');
 
         $this->writeFile(
-            $repository,
+            $publishRepository,
             $branch,
             $localesPath.'/'.$localeCode.'.po',
             $poContents,
@@ -163,7 +166,7 @@ class GitHubTranslationRepositoryService
         );
 
         $this->writeFile(
-            $repository,
+            $publishRepository,
             $branch,
             $webLocalesPath.'/'.$localeCode.'.json',
             $webCatalogContents,
@@ -171,7 +174,7 @@ class GitHubTranslationRepositoryService
         );
 
         $indexPath = $webLocalesPath.'/index.json';
-        $index = $this->readJsonFile($repository, $branch, $indexPath);
+        $index = $this->readJsonFile($publishRepository, $branch, $indexPath);
         $languages = [];
 
         foreach (($index['languages'] ?? []) as $item) {
@@ -192,7 +195,7 @@ class GitHubTranslationRepositoryService
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)."\n";
 
         $this->writeFile(
-            $repository,
+            $publishRepository,
             $branch,
             $indexPath,
             $indexContents,
@@ -209,10 +212,10 @@ class GitHubTranslationRepositoryService
         }
 
         $pr = $this->client()->post(
-            "https://api.github.com/repos/{$repository}/pulls",
+            "https://api.github.com/repos/{$pullRequestRepository}/pulls",
             [
                 'title' => 'i18n: atualização '.$localeCode,
-                'head' => $branch,
+                'head' => $this->crossForkHead($publishRepository, $pullRequestRepository, $branch),
                 'base' => $base,
                 'body' => "Atualização {$localeCode} gerada pelo Torrent Translate da CIATA.\n\n"
                     ."Inclui o catálogo PO usado no desktop (Windows, macOS e Linux), "
@@ -290,6 +293,32 @@ class GitHubTranslationRepositoryService
         $decoded = json_decode($this->decodeGitHubContent($response->json('content')), true);
 
         return is_array($decoded) ? $decoded : [];
+    }
+
+    private function sourceRepository(): string
+    {
+        return trim((string) config('torrent.github.source_repository'));
+    }
+
+    private function publishRepository(): string
+    {
+        return trim((string) config('torrent.github.publish_repository'));
+    }
+
+    private function pullRequestRepository(): string
+    {
+        return trim((string) config('torrent.github.pull_request_repository'));
+    }
+
+    private function crossForkHead(string $publishRepository, string $pullRequestRepository, string $branch): string
+    {
+        if (strcasecmp($publishRepository, $pullRequestRepository) === 0) {
+            return $branch;
+        }
+
+        [$owner] = explode('/', $publishRepository, 2);
+
+        return $owner.':'.$branch;
     }
 
     private function decodeGitHubContent(mixed $content): string

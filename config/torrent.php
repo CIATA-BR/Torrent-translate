@@ -26,7 +26,21 @@ return [
 
     'github' => [
         'token' => env('TORRENT_GITHUB_TOKEN'),
-        'repository' => env('TORRENT_GITHUB_REPOSITORY', 'CIATA-BR/SerrebiTorrent'),
+        // Source of truth is the upstream repository maintained by serrebidev.
+        'source_repository' => env(
+            'TORRENT_GITHUB_SOURCE_REPOSITORY',
+            env('TORRENT_GITHUB_REPOSITORY', 'serrebidev/SerrebiTorrent')
+        ),
+        // Translation branches are written only to the CIATA fork.
+        'publish_repository' => env(
+            'TORRENT_GITHUB_PUBLISH_REPOSITORY',
+            env('TORRENT_GITHUB_REPOSITORY', 'CIATA-BR/SerrebiTorrent')
+        ),
+        // Pull Requests are opened against upstream main.
+        'pull_request_repository' => env(
+            'TORRENT_GITHUB_PULL_REQUEST_REPOSITORY',
+            'serrebidev/SerrebiTorrent'
+        ),
         'source_ref' => env('TORRENT_GITHUB_SOURCE_REF', 'main'),
         'publish_base' => env('TORRENT_GITHUB_PUBLISH_BASE', 'main'),
         'pot_path' => env('TORRENT_GITHUB_POT_PATH', 'locales/serrebitorrent.pot'),
