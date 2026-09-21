@@ -99,6 +99,9 @@ class TranslationController extends Controller
             'text' => ['required', 'string'],
             'target_locale' => ['required', 'exists:locales,id'],
             'source_lang' => ['required', 'in:en-US,pt-BR'],
+            'filter' => ['nullable', 'in:untranslated'],
+            'q' => ['nullable', 'string', 'max:255'],
+            'page' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $translation = Translation::query()->firstOrNew([
@@ -141,11 +144,25 @@ class TranslationController extends Controller
             ->where('text', '<>', ''))->count();
         $percent = $total > 0 ? (int) floor(($translated / $total) * 100) : 0;
 
+        $query = [
+            'source_lang' => $data['source_lang'],
+            'target_locale' => $data['target_locale'],
+        ];
+
+        if (($data['filter'] ?? null) === 'untranslated') {
+            $query['filter'] = 'untranslated';
+        }
+
+        if (filled($data['q'] ?? null)) {
+            $query['q'] = trim((string) $data['q']);
+        }
+
+        if (! empty($data['page']) && (int) $data['page'] > 1) {
+            $query['page'] = (int) $data['page'];
+        }
+
         return redirect()
-            ->route('translations.index', [
-                'source_lang' => $data['source_lang'],
-                'target_locale' => $data['target_locale'],
-            ])
+            ->route('translations.index', $query)
             ->with('status', __('portal.progress', compact('translated', 'total', 'percent')));
     }
 
