@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\AuditTrail;
 use App\Services\MicrosoftGraphMailService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -92,27 +93,41 @@ class PasswordResetController extends Controller
 
     public function reset(Request $request, string $token)
     {
-        $record = $this->validToken($token);
-        abort_unless($record, 410, __('portal.password_reset_invalid'));
-
         $data = $request->validate([
             'password' => ['required', 'confirmed', 'min:12'],
         ]);
 
-        $user = User::query()->where('email', $record->email)->first();
-        abort_unless($user, 410, __('portal.password_reset_invalid'));
+        $tokenHash = hash('sha256', $token);
 
-        $user->forceFill([
-            'password' => Hash::make($data['password']),
-            'remember_token' => Str::random(60),
-        ])->save();
+        $user = DB::transaction(function () use ($data, $tokenHash): User {
+            $record = PasswordResetToken::query()
+                ->where('token_hash', $tokenHash)
+                ->whereNull('used_at')
+                ->where('expires_at', '>', now())
+                ->lockForUpdate()
+                ->first();
 
-        $record->update(['used_at' => now()]);
+            abort_unless($record, 410, __('portal.password_reset_invalid'));
 
-        PasswordResetToken::query()
-            ->where('email', $record->email)
-            ->whereNull('used_at')
-            ->update(['used_at' => now()]);
+            $user = User::query()
+                ->whereRaw('LOWER(email) = ?', [strtolower($record->email)])
+                ->lockForUpdate()
+                ->first();
+
+            abort_unless($user, 410, __('portal.password_reset_invalid'));
+
+            $user->forceFill([
+                'password' => Hash::make($data['password']),
+                'remember_token' => Str::random(60),
+            ])->save();
+
+            PasswordResetToken::query()
+                ->where('email', $record->email)
+                ->whereNull('used_at')
+                ->update(['used_at' => now()]);
+
+            return $user;
+        });
 
         $this->audit->record(
             'auth.password_reset_completed',
