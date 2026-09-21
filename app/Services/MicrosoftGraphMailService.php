@@ -13,10 +13,11 @@ class MicrosoftGraphMailService
         string $htmlBody,
         ?string $mailbox = null
     ): void {
-        $tenantId = (string) config('torrent.microsoft_graph.tenant_id');
-        $clientId = (string) config('torrent.microsoft_graph.client_id');
-        $clientSecret = (string) config('torrent.microsoft_graph.client_secret');
-        $mailboxToUse = $mailbox ?: (string) config('torrent.microsoft_graph.mailbox');
+        $tenantId = trim((string) config('torrent.microsoft_graph.tenant_id'));
+        $clientId = trim((string) config('torrent.microsoft_graph.client_id'));
+        $clientSecret = trim((string) config('torrent.microsoft_graph.client_secret'));
+        $mailboxToUse = trim((string) ($mailbox ?: config('torrent.microsoft_graph.mailbox')));
+        $saveToSentItems = (bool) config('torrent.microsoft_graph.save_to_sent_items', true);
 
         if ($tenantId === '' || $clientId === '' || $clientSecret === '' || $mailboxToUse === '') {
             throw new RuntimeException('Configuração do Microsoft Graph incompleta.');
@@ -39,7 +40,7 @@ class MicrosoftGraphMailService
             );
         }
 
-        $accessToken = (string) $tokenResponse->json('access_token');
+        $accessToken = trim((string) $tokenResponse->json('access_token'));
 
         if ($accessToken === '') {
             throw new RuntimeException('Microsoft Graph não retornou access_token.');
@@ -62,7 +63,7 @@ class MicrosoftGraphMailService
                     ->values()
                     ->all(),
             ],
-            'saveToSentItems' => true,
+            'saveToSentItems' => $saveToSentItems,
         ];
 
         $response = Http::withToken($accessToken)
