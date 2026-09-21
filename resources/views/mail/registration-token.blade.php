@@ -1,0 +1,1 @@
+<!doctype html><html lang="pt-BR"><body><p>Recebemos uma solicitação de cadastro no Torrent Translate.</p><p><a href="{{ $url }}">Confirmar e concluir cadastro</a></p><p>Este link expira em 30 minutos.</p></body></html>
