@@ -26,5 +26,6 @@ return [
         'publish_base' => env('TORRENT_GITHUB_PUBLISH_BASE', 'main'),
         'pot_path' => env('TORRENT_GITHUB_POT_PATH', 'locales/serrebitorrent.pot'),
         'locales_path' => env('TORRENT_GITHUB_LOCALES_PATH', 'locales'),
+        'web_locales_path' => env('TORRENT_GITHUB_WEB_LOCALES_PATH', 'web_static/locales'),
     ],
 ];

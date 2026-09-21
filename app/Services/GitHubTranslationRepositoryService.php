@@ -41,21 +41,18 @@ class GitHubTranslationRepositoryService
             );
         }
 
-        $content = str_replace("\n", '', (string) $response->json('content'));
-        $decoded = base64_decode($content, true);
-
-        if ($decoded === false) {
-            throw new RuntimeException('Conteúdo POT retornado pelo GitHub é inválido.');
-        }
-
-        return $decoded;
+        return $this->decodeGitHubContent($response->json('content'));
     }
 
-    public function publishPo(string $localeCode, string $poContents, ?string $base = null): string
-    {
+    public function publishTranslation(
+        string $localeCode,
+        string $localeName,
+        string $poContents,
+        string $webCatalogContents,
+        ?string $base = null
+    ): string {
         $repository = (string) config('torrent.github.repository');
         $base = $base ?: (string) config('torrent.github.publish_base');
-        $path = rtrim((string) config('torrent.github.locales_path'), '/').'/'.$localeCode.'.po';
 
         $refResponse = $this->client()->get(
             "https://api.github.com/repos/{$repository}/git/ref/heads/".rawurlencode($base)
@@ -72,10 +69,7 @@ class GitHubTranslationRepositoryService
 
         $createRef = $this->client()->post(
             "https://api.github.com/repos/{$repository}/git/refs",
-            [
-                'ref' => 'refs/heads/'.$branch,
-                'sha' => $baseSha,
-            ]
+            ['ref' => 'refs/heads/'.$branch, 'sha' => $baseSha]
         );
 
         if (! $createRef->successful()) {
@@ -84,14 +78,91 @@ class GitHubTranslationRepositoryService
             );
         }
 
+        $localesPath = rtrim((string) config('torrent.github.locales_path'), '/');
+        $webLocalesPath = rtrim((string) config('torrent.github.web_locales_path'), '/');
+
+        $this->writeFile(
+            $repository,
+            $branch,
+            $localesPath.'/'.$localeCode.'.po',
+            $poContents,
+            'i18n: update '.$localeCode.' translation'
+        );
+
+        $this->writeFile(
+            $repository,
+            $branch,
+            $webLocalesPath.'/'.$localeCode.'.json',
+            $webCatalogContents,
+            'i18n: compile '.$localeCode.' web catalog'
+        );
+
+        $indexPath = $webLocalesPath.'/index.json';
+        $index = $this->readJsonFile($repository, $branch, $indexPath);
+        $languages = [];
+
+        foreach (($index['languages'] ?? []) as $item) {
+            if (is_array($item) && filled($item['code'] ?? null) && filled($item['name'] ?? null)) {
+                $languages[(string) $item['code']] = (string) $item['name'];
+            }
+        }
+
+        $languages[$localeCode] = $localeName;
+        uksort($languages, 'strnatcasecmp');
+
+        $indexContents = json_encode([
+            'languages' => array_map(
+                fn (string $code, string $name) => ['code' => $code, 'name' => $name],
+                array_keys($languages),
+                array_values($languages)
+            ),
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)."\n";
+
+        $this->writeFile(
+            $repository,
+            $branch,
+            $indexPath,
+            $indexContents,
+            'i18n: update web language index'
+        );
+
+        $pr = $this->client()->post(
+            "https://api.github.com/repos/{$repository}/pulls",
+            [
+                'title' => 'i18n: atualização '.$localeCode,
+                'head' => $branch,
+                'base' => $base,
+                'body' => "Atualização {$localeCode} gerada pelo Torrent Translate da CIATA.\n\n"
+                    ."Inclui o catálogo PO usado no desktop (Windows, macOS e Linux), "
+                    ."o JSON compilado para a Web UI e o índice de idiomas.\n\n"
+                    ."O merge permanece manual.",
+            ]
+        );
+
+        if (! $pr->successful()) {
+            throw new RuntimeException(
+                'Arquivos publicados, mas falhou ao abrir PR: '.$pr->status().' - '.$pr->body()
+            );
+        }
+
+        return (string) $pr->json('html_url');
+    }
+
+    private function writeFile(
+        string $repository,
+        string $branch,
+        string $path,
+        string $contents,
+        string $message
+    ): void {
         $existing = $this->client()->get(
             "https://api.github.com/repos/{$repository}/contents/{$path}",
             ['ref' => $branch]
         );
 
         $payload = [
-            'message' => 'i18n: update '.$localeCode.' translation',
-            'content' => base64_encode($poContents),
+            'message' => $message,
+            'content' => base64_encode($contents),
             'branch' => $branch,
         ];
 
@@ -106,26 +177,42 @@ class GitHubTranslationRepositoryService
 
         if (! $write->successful()) {
             throw new RuntimeException(
-                'Falha ao gravar catálogo no GitHub: '.$write->status().' - '.$write->body()
+                'Falha ao gravar '.$path.' no GitHub: '.$write->status().' - '.$write->body()
             );
         }
+    }
 
-        $pr = $this->client()->post(
-            "https://api.github.com/repos/{$repository}/pulls",
-            [
-                'title' => 'i18n: atualização '.$localeCode,
-                'head' => $branch,
-                'base' => $base,
-                'body' => "Atualização do catálogo {$localeCode} gerada pelo Torrent Translate da CIATA.\n\nO merge permanece manual.",
-            ]
+    private function readJsonFile(string $repository, string $ref, string $path): array
+    {
+        $response = $this->client()->get(
+            "https://api.github.com/repos/{$repository}/contents/{$path}",
+            ['ref' => $ref]
         );
 
-        if (! $pr->successful()) {
+        if ($response->status() === 404) {
+            return [];
+        }
+
+        if (! $response->successful()) {
             throw new RuntimeException(
-                'Arquivo publicado, mas falhou ao abrir PR: '.$pr->status().' - '.$pr->body()
+                'Falha ao ler '.$path.' no GitHub: '.$response->status().' - '.$response->body()
             );
         }
 
-        return (string) $pr->json('html_url');
+        $decoded = json_decode($this->decodeGitHubContent($response->json('content')), true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    private function decodeGitHubContent(mixed $content): string
+    {
+        $normalized = str_replace("\n", '', (string) $content);
+        $decoded = base64_decode($normalized, true);
+
+        if ($decoded === false) {
+            throw new RuntimeException('Conteúdo retornado pelo GitHub é inválido.');
+        }
+
+        return $decoded;
     }
 }

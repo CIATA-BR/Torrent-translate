@@ -109,8 +109,14 @@ class AdminTranslationController extends Controller
         $locale = Locale::query()->findOrFail((int) $data['locale_id']);
 
         try {
-            $contents = $this->po->build($locale);
-            $url = $this->github->publishPo($locale->code, $contents);
+            $poContents = $this->po->build($locale);
+            $webCatalogContents = $this->po->buildWebCatalog($locale);
+            $url = $this->github->publishTranslation(
+                $locale->code,
+                $locale->name,
+                $poContents,
+                $webCatalogContents
+            );
         } catch (\Throwable $e) {
             Log::error('Falha ao publicar tradução pelo painel administrativo.', [
                 'locale' => $locale->code,
