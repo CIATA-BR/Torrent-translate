@@ -121,6 +121,31 @@ class GitHubTranslationRepositoryService
 
         $existingPr = $this->openTranslationPullRequests([$localeCode], $base)[$localeCode] ?? null;
 
+        $localesPath = rtrim((string) config('torrent.github.locales_path'), '/');
+        $webLocalesPath = rtrim((string) config('torrent.github.web_locales_path'), '/');
+        $indexPath = $webLocalesPath.'/index.json';
+
+        $basePo = $this->readTextFile($pullRequestRepository, $base, $localesPath.'/'.$localeCode.'.po');
+        $baseWeb = $this->readJsonFile($pullRequestRepository, $base, $webLocalesPath.'/'.$localeCode.'.json');
+        $baseIndex = $this->readJsonFile($pullRequestRepository, $base, $indexPath);
+
+        $desiredWeb = json_decode($webCatalogContents, true);
+        $desiredIndex = $this->buildUpdatedIndex($baseIndex, $localeCode, $localeName);
+
+        if (
+            $this->normalizedText($basePo) === $this->normalizedText($poContents)
+            && $this->normalizedJson($baseWeb) === $this->normalizedJson($desiredWeb)
+            && $this->normalizedJson($baseIndex) === $this->normalizedJson($desiredIndex)
+        ) {
+            return [
+                'created' => false,
+                'no_changes' => true,
+                'number' => $existingPr['number'] ?? null,
+                'url' => $existingPr['url'] ?? null,
+                'branch' => $existingPr['branch'] ?? null,
+            ];
+        }
+
         if ($existingPr) {
             $branch = $existingPr['branch'];
             $created = false;
@@ -154,9 +179,6 @@ class GitHubTranslationRepositoryService
             $created = true;
         }
 
-        $localesPath = rtrim((string) config('torrent.github.locales_path'), '/');
-        $webLocalesPath = rtrim((string) config('torrent.github.web_locales_path'), '/');
-
         $this->writeFile(
             $publishRepository,
             $branch,
@@ -173,26 +195,13 @@ class GitHubTranslationRepositoryService
             'i18n: compile '.$localeCode.' web catalog'
         );
 
-        $indexPath = $webLocalesPath.'/index.json';
         $index = $this->readJsonFile($publishRepository, $branch, $indexPath);
-        $languages = [];
+        $updatedIndex = $this->buildUpdatedIndex($index, $localeCode, $localeName);
 
-        foreach (($index['languages'] ?? []) as $item) {
-            if (is_array($item) && filled($item['code'] ?? null) && filled($item['name'] ?? null)) {
-                $languages[(string) $item['code']] = (string) $item['name'];
-            }
-        }
-
-        $languages[$localeCode] = $localeName;
-        uksort($languages, 'strnatcasecmp');
-
-        $indexContents = json_encode([
-            'languages' => array_map(
-                fn (string $code, string $name) => ['code' => $code, 'name' => $name],
-                array_keys($languages),
-                array_values($languages)
-            ),
-        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)."\n";
+        $indexContents = json_encode(
+            $updatedIndex,
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR
+        )."\n";
 
         $this->writeFile(
             $publishRepository,
@@ -273,6 +282,26 @@ class GitHubTranslationRepositoryService
         }
     }
 
+    private function readTextFile(string $repository, string $ref, string $path): string
+    {
+        $response = $this->client()->get(
+            "https://api.github.com/repos/{$repository}/contents/{$path}",
+            ['ref' => $ref]
+        );
+
+        if ($response->status() === 404) {
+            return '';
+        }
+
+        if (! $response->successful()) {
+            throw new RuntimeException(
+                'Falha ao ler '.$path.' no GitHub: '.$response->status().' - '.$response->body()
+            );
+        }
+
+        return $this->decodeGitHubContent($response->json('content'));
+    }
+
     private function readJsonFile(string $repository, string $ref, string $path): array
     {
         $response = $this->client()->get(
@@ -293,6 +322,57 @@ class GitHubTranslationRepositoryService
         $decoded = json_decode($this->decodeGitHubContent($response->json('content')), true);
 
         return is_array($decoded) ? $decoded : [];
+    }
+
+    private function buildUpdatedIndex(array $index, string $localeCode, string $localeName): array
+    {
+        $languages = [];
+
+        foreach (($index['languages'] ?? []) as $item) {
+            if (is_array($item) && filled($item['code'] ?? null) && filled($item['name'] ?? null)) {
+                $languages[(string) $item['code']] = (string) $item['name'];
+            }
+        }
+
+        $languages[$localeCode] = $localeName;
+        uksort($languages, 'strnatcasecmp');
+
+        return [
+            'languages' => array_map(
+                fn (string $code, string $name) => ['code' => $code, 'name' => $name],
+                array_keys($languages),
+                array_values($languages)
+            ),
+        ];
+    }
+
+    private function normalizedText(string $value): string
+    {
+        return str_replace(["\r\n", "\r"], "\n", trim($value));
+    }
+
+    private function normalizedJson(mixed $value): string
+    {
+        if (! is_array($value)) {
+            return '';
+        }
+
+        return json_encode($this->sortRecursively($value), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+    }
+
+    private function sortRecursively(array $value): array
+    {
+        foreach ($value as $key => $item) {
+            if (is_array($item)) {
+                $value[$key] = $this->sortRecursively($item);
+            }
+        }
+
+        if (! array_is_list($value)) {
+            ksort($value);
+        }
+
+        return $value;
     }
 
     private function sourceRepository(): string

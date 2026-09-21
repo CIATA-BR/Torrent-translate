@@ -122,6 +122,7 @@ return [
     'admin_publish_success' => 'Tradução :locale publicada na nova Pull Request #:number.',
     'admin_update_success' => 'Pull Request #:number de :locale atualizada com a versão mais recente da tradução.',
     'admin_publish_failed' => 'Não foi possível publicar :locale. Consulte o log do servidor.',
+    'admin_publish_no_changes' => 'Nenhuma alteração foi encontrada para :locale. O catálogo já está sincronizado com a branch base; nenhuma Pull Request foi criada ou atualizada.',
     'admin_open_pr' => 'Abrir Pull Request criado',
     'admin_open_pr_number' => 'Abrir Pull Request #:number',
     'admin_pr_status' => 'Pull Request',

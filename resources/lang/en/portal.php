@@ -122,6 +122,7 @@ return [
     'admin_publish_success' => ':locale published in new Pull Request #:number.',
     'admin_update_success' => 'Pull Request #:number for :locale was updated with the latest translation.',
     'admin_publish_failed' => ':locale could not be published. Check the server log.',
+    'admin_publish_no_changes' => 'No changes were found for :locale. The catalog already matches the base branch; no Pull Request was created or updated.',
     'admin_open_pr' => 'Open created Pull Request',
     'admin_open_pr_number' => 'Open Pull Request #:number',
     'admin_pr_status' => 'Pull Request',

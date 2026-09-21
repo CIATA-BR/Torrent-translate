@@ -175,6 +175,12 @@ class AdminTranslationController extends Controller
             ]);
         }
 
+        if ($result['no_changes'] ?? false) {
+            return back()->with('status', __('portal.admin_publish_no_changes', [
+                'locale' => $locale->code,
+            ]));
+        }
+
         $this->audit->record(
             $result['created'] ? 'catalog.pull_request_created' : 'catalog.pull_request_updated',
             $request->user(),
