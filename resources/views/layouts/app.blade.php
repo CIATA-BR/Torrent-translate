@@ -11,7 +11,7 @@
 <header class="site-header">
 <div class="container">
 <strong>{{ __('portal.brand') }}</strong>
-<nav aria-label="{{ __('portal.site_language') }}">
+<nav aria-label="{{ __('portal.primary_navigation') }}">
 <a href="{{ request()->fullUrlWithQuery(['site_lang' => 'pt-BR']) }}" lang="pt-BR">{{ __('portal.portuguese') }}</a>
 <span aria-hidden="true"> | </span>
 <a href="{{ request()->fullUrlWithQuery(['site_lang' => 'en-US']) }}" lang="en">{{ __('portal.english') }}</a>
@@ -19,12 +19,19 @@
 <span aria-hidden="true"> | </span>
 <a href="{{ route('admin.translations.index') }}">{{ __('portal.admin_link') }}</a>
 @endif
+@if(auth()->check())
+<span aria-hidden="true"> | </span>
+<form method="post" action="{{ route('logout') }}" style="display:inline">
+@csrf
+<button type="submit">{{ __('portal.logout') }}</button>
+</form>
+@endif
 </nav>
 </div>
 </header>
 <main id="conteudo" class="container" tabindex="-1">
 @if(session('status'))
-<div class="alert success" role="status" aria-live="polite" aria-atomic="true">{{ session('status') }}</div>
+<div id="flash-status" class="alert success" role="status" aria-live="polite" aria-atomic="true" tabindex="-1">{{ session('status') }}</div>
 @endif
 @if($errors->any())
 <div class="alert error" role="alert" tabindex="-1">
@@ -34,5 +41,10 @@
 @endif
 @yield('content')
 </main>
+@if(session('status'))
+<script>
+document.getElementById('flash-status')?.focus();
+</script>
+@endif
 </body>
 </html>

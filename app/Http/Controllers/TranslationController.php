@@ -67,20 +67,7 @@ class TranslationController extends Controller
             array_values(array_unique(array_filter([$targetLocale->id, $ptBr?->id])))
         )]);
 
-        $totalQuery = TranslationSource::query()->where('active', true);
-        if ($sourceLanguage === 'pt-BR' && $ptBr) {
-            $totalQuery->whereHas('translations', fn ($q) => $q
-                ->where('locale_id', $ptBr->id)
-                ->whereNotNull('text')
-                ->where('text', '<>', ''));
-        }
-
-        $total = $totalQuery->count();
-        $translated = (clone $totalQuery)->whereHas('translations', fn ($q) => $q
-            ->where('locale_id', $targetLocale->id)
-            ->whereNotNull('text')
-            ->where('text', '<>', ''))->count();
-        $percent = $total > 0 ? (int) floor(($translated / $total) * 100) : 0;
+        $metrics = $this->catalogMetrics($targetLocale);
 
         return view('translations.index', [
             'sources' => $query->paginate(25)->withQueryString(),
@@ -91,9 +78,7 @@ class TranslationController extends Controller
             'filter' => $filter,
             'search' => $search,
             'editId' => $editId,
-            'total' => $total,
-            'translated' => $translated,
-            'percent' => $percent,
+            ...$metrics,
         ]);
     }
 
@@ -151,22 +136,8 @@ class TranslationController extends Controller
             'new_status' => $translation->status,
         ]);
 
-        $totalQuery = TranslationSource::query()->where('active', true);
-
-        if ($data['source_lang'] === 'pt-BR') {
-            $ptBr = Locale::query()->where('code', 'pt-BR')->firstOrFail();
-            $totalQuery->whereHas('translations', fn ($q) => $q
-                ->where('locale_id', $ptBr->id)
-                ->whereNotNull('text')
-                ->where('text', '<>', ''));
-        }
-
-        $total = $totalQuery->count();
-        $translated = (clone $totalQuery)->whereHas('translations', fn ($q) => $q
-            ->where('locale_id', (int) $data['target_locale'])
-            ->whereNotNull('text')
-            ->where('text', '<>', ''))->count();
-        $percent = $total > 0 ? (int) floor(($translated / $total) * 100) : 0;
+        $targetLocale = Locale::query()->findOrFail((int) $data['target_locale']);
+        $metrics = $this->catalogMetrics($targetLocale);
 
         $query = [
             'source_lang' => $data['source_lang'],
@@ -187,7 +158,12 @@ class TranslationController extends Controller
 
         return redirect()
             ->route('translations.index', $query)
-            ->with('status', __('portal.progress', compact('translated', 'total', 'percent')));
+            ->with('status', __('portal.progress_with_validation', [
+                'translated' => $metrics['translated'],
+                'total' => $metrics['total'],
+                'percent' => $metrics['percent'],
+                'invalid' => $metrics['invalid'],
+            ]));
     }
 
     public function export(Request $request): StreamedResponse
@@ -198,14 +174,9 @@ class TranslationController extends Controller
         ]);
 
         $locale = Locale::query()->findOrFail((int) $data['target_locale']);
-        $ptBr = Locale::query()->where('code', 'pt-BR')->first();
 
         $sources = TranslationSource::query()
             ->where('active', true)
-            ->when($data['source_lang'] === 'pt-BR', fn ($q) => $q->whereHas('translations', fn ($t) => $t
-                ->where('locale_id', $ptBr?->id)
-                ->whereNotNull('text')
-                ->where('text', '<>', '')))
             ->with(['translations' => fn ($q) => $q->where('locale_id', $locale->id)])
             ->orderBy('id')
             ->get();
@@ -222,9 +193,7 @@ class TranslationController extends Controller
                 continue;
             }
 
-            $issues = $this->validator->validate($source->msgid, $text);
-
-            if ($issues !== []) {
+            if ($this->validator->validate($source->msgid, $text) !== []) {
                 $invalid[] = $source->id;
             }
         }
@@ -261,6 +230,40 @@ class TranslationController extends Controller
                 echo 'msgstr "'.$this->poEscape((string) $translation->text).'"'."\n\n";
             }
         }, $filename, ['Content-Type' => 'text/x-gettext-translation; charset=UTF-8']);
+    }
+
+    private function catalogMetrics(Locale $locale): array
+    {
+        $sources = TranslationSource::query()
+            ->where('active', true)
+            ->with(['translations' => fn ($q) => $q->where('locale_id', $locale->id)])
+            ->get();
+
+        $total = $sources->count();
+        $translated = 0;
+        $invalid = 0;
+
+        foreach ($sources as $source) {
+            $text = trim((string) $source->translations->first()?->text);
+
+            if ($text === '') {
+                continue;
+            }
+
+            $translated++;
+
+            if ($this->validator->validate($source->msgid, $text) !== []) {
+                $invalid++;
+            }
+        }
+
+        return [
+            'total' => $total,
+            'translated' => $translated,
+            'invalid' => $invalid,
+            'percent' => $total > 0 ? (int) floor(($translated / $total) * 100) : 0,
+            'publishable' => $total > 0 && $translated === $total && $invalid === 0,
+        ];
     }
 
     private function poEscape(string $value): string

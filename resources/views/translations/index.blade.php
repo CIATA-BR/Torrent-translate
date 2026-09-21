@@ -38,13 +38,17 @@
 </form>
 
 <p id="translation-progress" role="status" aria-live="polite" aria-atomic="true">
-{{ __('portal.progress', ['translated' => $translated, 'total' => $total, 'percent' => $percent]) }}
+{{ __('portal.progress_with_validation', ['translated' => $translated, 'total' => $total, 'percent' => $percent, 'invalid' => $invalid]) }}
 </p>
 
-@if($percent === 100 && $total > 0)
+@if($sourceLanguage === 'pt-BR' && $translated < $total)
+<p>{{ __('portal.portuguese_source_help') }}</p>
+@endif
+
+@if($publishable)
 <p><a class="button-link" href="{{ route('translations.export', ['target_locale' => $targetLocale->id, 'source_lang' => $sourceLanguage]) }}">{{ __('portal.generate') }} — {{ $targetLocale->code }}.po</a></p>
 @else
-<p>{{ __('portal.generate_help') }}</p>
+<p>{{ __('portal.generate_help_validated') }}</p>
 @endif
 
 @forelse($sources as $source)
