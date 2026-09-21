@@ -61,6 +61,8 @@ return [
     'generate_help_validated' => 'O arquivo poderá ser gerado quando o catálogo inteiro estiver traduzido e nenhuma tradução tiver erro de validação.',
     'no_entries' => 'Nenhum termo disponível para os filtros selecionados.',
     'review_errors' => 'Revise os campos abaixo.',
+    'registration_request_help' => 'Informe seu e-mail. Enviaremos um link seguro para concluir o cadastro.',
+    'registration_send_link' => 'Enviar link de confirmação',
     'registration_sent_title' => 'Confira seu e-mail',
     'registration_sent' => 'Enviamos um link de confirmação para :email.',
     'registration_expires' => 'O link expira em 30 minutos.',

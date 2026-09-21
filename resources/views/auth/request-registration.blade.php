@@ -10,11 +10,19 @@
 <p><a href="{{ url('/') }}">{{ __('portal.back_home') }}</a></p>
 @else
 <h1>{{ __('portal.create_account') }}</h1>
-<p>Informe seu e-mail. Enviaremos um link seguro para concluir o cadastro.</p>
+<p>{{ __('portal.registration_request_help') }}</p>
 <form method="post" action="{{ route('register.send') }}">
 @csrf
-<div class="field"><label for="email">{{ __('portal.email') }}</label><input id="email" name="email" type="email" autocomplete="email" required value="{{ old('email') }}"></div>
-<button type="submit">Enviar link de confirmação</button>
+<x-text-field
+    id="email"
+    name="email"
+    type="email"
+    :label="__('portal.email')"
+    autocomplete="email"
+    :required="true"
+    :error="$errors->first('email') ?: null"
+/>
+<button type="submit">{{ __('portal.registration_send_link') }}</button>
 </form>
 @endif
 @endsection

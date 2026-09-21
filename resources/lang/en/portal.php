@@ -61,6 +61,8 @@ return [
     'generate_help_validated' => 'The file can be generated when the full catalog is translated and no translation has validation errors.',
     'no_entries' => 'No terms are available for the selected filters.',
     'review_errors' => 'Review the fields below.',
+    'registration_request_help' => 'Enter your email. We will send a secure link to complete registration.',
+    'registration_send_link' => 'Send confirmation link',
     'registration_sent_title' => 'Check your email',
     'registration_sent' => 'We sent a confirmation link to :email.',
     'registration_expires' => 'The link expires in 30 minutes.',

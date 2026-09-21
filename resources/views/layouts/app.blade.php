@@ -40,7 +40,7 @@
 <div id="flash-status" class="alert success" role="status" aria-live="polite" aria-atomic="true" tabindex="-1">{{ session('status') }}</div>
 @endif
 @if($errors->any())
-<div class="alert error" role="alert" tabindex="-1">
+<div id="error-summary" class="alert error" role="alert" tabindex="-1">
 <strong>{{ __('portal.review_errors') }}</strong>
 <ul>@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
 </div>
@@ -114,7 +114,11 @@ document.querySelectorAll('[data-password-toggle]').forEach((button) => {
     });
 });
 </script>
-@if(session('status'))
+@if($errors->any())
+<script>
+document.getElementById('error-summary')?.focus();
+</script>
+@elseif(session('status'))
 <script>
 document.getElementById('flash-status')?.focus();
 </script>
