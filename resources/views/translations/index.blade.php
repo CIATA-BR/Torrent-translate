@@ -80,6 +80,9 @@ $statusKey = match($targetTranslation?->status) {
 <form method="post" action="{{ route('translations.store', $source) }}" class="translation-form">
 @csrf
 <input type="hidden" name="source_id" value="{{ $source->id }}">
+@if($targetTranslation?->updated_at)
+<input type="hidden" name="version" value="{{ $targetTranslation->updated_at->toISOString() }}">
+@endif
 <input type="hidden" name="target_locale" value="{{ $targetLocale->id }}">
 <input type="hidden" name="source_lang" value="{{ $sourceLanguage }}">
 @if($filter !== '')

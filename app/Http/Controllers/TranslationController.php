@@ -97,6 +97,7 @@ class TranslationController extends Controller
             'filter' => ['nullable', 'in:untranslated'],
             'q' => ['nullable', 'string', 'max:255'],
             'page' => ['nullable', 'integer', 'min:1'],
+            'version' => ['nullable', 'string', 'max:64'],
         ]);
 
         $text = trim($data['text']);
@@ -120,6 +121,16 @@ class TranslationController extends Controller
             'translation_source_id' => $source->id,
             'locale_id' => (int) $data['target_locale'],
         ]);
+
+        if ($translation->exists) {
+            $currentVersion = $translation->updated_at?->toISOString();
+
+            if (filled($data['version'] ?? null) && $currentVersion !== $data['version']) {
+                throw ValidationException::withMessages([
+                    'text' => [__('portal.translation_changed_reload')],
+                ]);
+            }
+        }
 
         $oldText = $translation->text;
         $oldStatus = $translation->status;

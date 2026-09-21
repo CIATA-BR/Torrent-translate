@@ -51,6 +51,7 @@ return [
     'apply_filters' => 'Aplicar filtros',
     'original_text' => 'Texto original',
     'translation' => 'Tradução',
+    'translation_changed_reload' => 'Esta tradução foi alterada por outra pessoa. Recarregue a página para revisar a versão mais recente antes de salvar.',
     'save' => 'Salvar',
     'change' => 'Alterar',
     'cancel_change' => 'Cancelar alteração',

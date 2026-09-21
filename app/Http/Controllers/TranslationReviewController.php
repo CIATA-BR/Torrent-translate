@@ -36,7 +36,14 @@ class TranslationReviewController extends Controller
         $data = $request->validate([
             'text' => ['required', 'string'],
             'action' => ['required', 'in:approve,reject'],
+            'version' => ['required', 'string', 'max:64'],
         ]);
+
+        if ($translation->updated_at?->toISOString() !== $data['version']) {
+            throw ValidationException::withMessages([
+                'text' => [__('portal.translation_changed_reload')],
+            ]);
+        }
 
         $text = trim($data['text']);
 

@@ -29,6 +29,7 @@ $reviewError = $submittedTranslationId === $translation->id ? $errors->first('te
 <form method="post" action="{{ route('review.translations.update', $translation) }}">
 @csrf
 <input type="hidden" name="translation_id" value="{{ $translation->id }}">
+<input type="hidden" name="version" value="{{ $translation->updated_at?->toISOString() }}">
 <div class="ciata-field">
 <label class="ciata-field__label" for="review-text-{{ $translation->id }}">{{ __('portal.translation') }} <span class="ciata-field__required">({{ __('portal.required') }})</span></label>
 <textarea

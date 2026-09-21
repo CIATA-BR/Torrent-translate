@@ -51,6 +51,7 @@ return [
     'apply_filters' => 'Apply filters',
     'original_text' => 'Original text',
     'translation' => 'Translation',
+    'translation_changed_reload' => 'This translation was changed by someone else. Reload the page and review the latest version before saving.',
     'save' => 'Save',
     'change' => 'Edit',
     'cancel_change' => 'Cancel editing',
