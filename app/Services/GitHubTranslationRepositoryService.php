@@ -44,38 +44,111 @@ class GitHubTranslationRepositoryService
         return $this->decodeGitHubContent($response->json('content'));
     }
 
+    public function openTranslationPullRequests(array $localeCodes, ?string $base = null): array
+    {
+        $repository = (string) config('torrent.github.repository');
+        $base = $base ?: (string) config('torrent.github.publish_base');
+
+        $response = $this->client()->get(
+            "https://api.github.com/repos/{$repository}/pulls",
+            [
+                'state' => 'open',
+                'base' => $base,
+                'per_page' => 100,
+                'sort' => 'updated',
+                'direction' => 'desc',
+            ]
+        );
+
+        if (! $response->successful()) {
+            throw new RuntimeException(
+                'Falha ao consultar Pull Requests de tradução: '
+                .$response->status().' - '.$response->body()
+            );
+        }
+
+        $wanted = [];
+        foreach ($localeCodes as $code) {
+            $wanted[strtolower((string) $code)] = (string) $code;
+        }
+
+        $result = [];
+
+        foreach ($response->json() ?? [] as $pr) {
+            $branch = (string) data_get($pr, 'head.ref', '');
+            $headRepo = (string) data_get($pr, 'head.repo.full_name', '');
+
+            if ($branch === '' || ($headRepo !== '' && strcasecmp($headRepo, $repository) !== 0)) {
+                continue;
+            }
+
+            foreach ($wanted as $normalized => $original) {
+                $prefix = 'translations/'.$normalized;
+
+                if ($branch !== $prefix && ! str_starts_with($branch, $prefix.'-')) {
+                    continue;
+                }
+
+                if (isset($result[$original])) {
+                    continue;
+                }
+
+                $result[$original] = [
+                    'number' => (int) data_get($pr, 'number'),
+                    'url' => (string) data_get($pr, 'html_url'),
+                    'branch' => $branch,
+                    'title' => (string) data_get($pr, 'title'),
+                    'updated_at' => (string) data_get($pr, 'updated_at'),
+                ];
+            }
+        }
+
+        return $result;
+    }
+
     public function publishTranslation(
         string $localeCode,
         string $localeName,
         string $poContents,
         string $webCatalogContents,
         ?string $base = null
-    ): string {
+    ): array {
         $repository = (string) config('torrent.github.repository');
         $base = $base ?: (string) config('torrent.github.publish_base');
 
-        $refResponse = $this->client()->get(
-            "https://api.github.com/repos/{$repository}/git/ref/heads/".rawurlencode($base)
-        );
+        $existingPr = $this->openTranslationPullRequests([$localeCode], $base)[$localeCode] ?? null;
 
-        if (! $refResponse->successful()) {
-            throw new RuntimeException(
-                'Falha ao localizar branch base no GitHub: '.$refResponse->status().' - '.$refResponse->body()
+        if ($existingPr) {
+            $branch = $existingPr['branch'];
+            $created = false;
+        } else {
+            $refResponse = $this->client()->get(
+                "https://api.github.com/repos/{$repository}/git/ref/heads/".rawurlencode($base)
             );
-        }
 
-        $baseSha = (string) $refResponse->json('object.sha');
-        $branch = 'translations/'.strtolower($localeCode).'-'.now()->format('Ymd-His');
+            if (! $refResponse->successful()) {
+                throw new RuntimeException(
+                    'Falha ao localizar branch base no GitHub: '
+                    .$refResponse->status().' - '.$refResponse->body()
+                );
+            }
 
-        $createRef = $this->client()->post(
-            "https://api.github.com/repos/{$repository}/git/refs",
-            ['ref' => 'refs/heads/'.$branch, 'sha' => $baseSha]
-        );
+            $baseSha = (string) $refResponse->json('object.sha');
+            $branch = 'translations/'.strtolower($localeCode).'-'.now()->format('Ymd-His');
 
-        if (! $createRef->successful()) {
-            throw new RuntimeException(
-                'Falha ao criar branch de tradução: '.$createRef->status().' - '.$createRef->body()
+            $createRef = $this->client()->post(
+                "https://api.github.com/repos/{$repository}/git/refs",
+                ['ref' => 'refs/heads/'.$branch, 'sha' => $baseSha]
             );
+
+            if (! $createRef->successful()) {
+                throw new RuntimeException(
+                    'Falha ao criar branch de tradução: '
+                    .$createRef->status().' - '.$createRef->body()
+                );
+            }
+
+            $created = true;
         }
 
         $localesPath = rtrim((string) config('torrent.github.locales_path'), '/');
@@ -126,6 +199,15 @@ class GitHubTranslationRepositoryService
             'i18n: update web language index'
         );
 
+        if ($existingPr) {
+            return [
+                'created' => false,
+                'number' => $existingPr['number'],
+                'url' => $existingPr['url'],
+                'branch' => $branch,
+            ];
+        }
+
         $pr = $this->client()->post(
             "https://api.github.com/repos/{$repository}/pulls",
             [
@@ -141,11 +223,17 @@ class GitHubTranslationRepositoryService
 
         if (! $pr->successful()) {
             throw new RuntimeException(
-                'Arquivos publicados, mas falhou ao abrir PR: '.$pr->status().' - '.$pr->body()
+                'Arquivos publicados, mas falhou ao abrir PR: '
+                .$pr->status().' - '.$pr->body()
             );
         }
 
-        return (string) $pr->json('html_url');
+        return [
+            'created' => true,
+            'number' => (int) $pr->json('number'),
+            'url' => (string) $pr->json('html_url'),
+            'branch' => $branch,
+        ];
     }
 
     private function writeFile(

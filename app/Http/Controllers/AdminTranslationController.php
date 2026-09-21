@@ -28,45 +28,67 @@ class AdminTranslationController extends Controller
             ->get();
 
         $total = $sources->count();
+        $githubConfigured = filled(config('torrent.github.token'));
 
-        $locales = Locale::query()
+        $localeModels = Locale::query()
             ->where('active', true)
             ->orderBy('name')
-            ->get()
-            ->map(function (Locale $locale) use ($sources, $total) {
-                $translated = 0;
-                $invalid = 0;
+            ->get();
 
-                foreach ($sources as $source) {
-                    $translation = $source->translations->firstWhere('locale_id', $locale->id);
-                    $text = trim((string) $translation?->text);
+        $openPullRequests = [];
+        $githubStatusError = false;
 
-                    if ($text === '') {
-                        continue;
-                    }
+        if ($githubConfigured && $localeModels->isNotEmpty()) {
+            try {
+                $openPullRequests = $this->github->openTranslationPullRequests(
+                    $localeModels->pluck('code')->all()
+                );
+            } catch (\Throwable $e) {
+                $githubStatusError = true;
 
-                    $translated++;
+                Log::warning('Falha ao consultar PRs abertas de tradução.', [
+                    'exception_class' => $e::class,
+                    'message' => $e->getMessage(),
+                ]);
+            }
+        }
 
-                    if ($this->validator->validate($source->msgid, $text) !== []) {
-                        $invalid++;
-                    }
+        $locales = $localeModels->map(function (Locale $locale) use ($sources, $total, $openPullRequests) {
+            $translated = 0;
+            $invalid = 0;
+
+            foreach ($sources as $source) {
+                $translation = $source->translations->firstWhere('locale_id', $locale->id);
+                $text = trim((string) $translation?->text);
+
+                if ($text === '') {
+                    continue;
                 }
 
-                $percent = $total > 0 ? (int) floor(($translated / $total) * 100) : 0;
+                $translated++;
 
-                return [
-                    'locale' => $locale,
-                    'translated' => $translated,
-                    'total' => $total,
-                    'percent' => $percent,
-                    'invalid' => $invalid,
-                    'publishable' => $total > 0 && $translated === $total && $invalid === 0,
-                ];
-            });
+                if ($this->validator->validate($source->msgid, $text) !== []) {
+                    $invalid++;
+                }
+            }
+
+            $percent = $total > 0 ? (int) floor(($translated / $total) * 100) : 0;
+
+            return [
+                'locale' => $locale,
+                'translated' => $translated,
+                'total' => $total,
+                'percent' => $percent,
+                'invalid' => $invalid,
+                'publishable' => $total > 0 && $translated === $total && $invalid === 0,
+                'pull_request' => $openPullRequests[$locale->code] ?? null,
+            ];
+        });
 
         return view('admin.translations', [
             'locales' => $locales,
-            'githubConfigured' => filled(config('torrent.github.token')),
+            'githubConfigured' => $githubConfigured,
+            'githubStatusError' => $githubStatusError,
             'sourceRef' => config('torrent.github.source_ref'),
             'publishBase' => config('torrent.github.publish_base'),
         ]);
@@ -111,7 +133,7 @@ class AdminTranslationController extends Controller
         try {
             $poContents = $this->po->build($locale);
             $webCatalogContents = $this->po->buildWebCatalog($locale);
-            $url = $this->github->publishTranslation(
+            $result = $this->github->publishTranslation(
                 $locale->code,
                 $locale->name,
                 $poContents,
@@ -129,8 +151,13 @@ class AdminTranslationController extends Controller
             ]);
         }
 
+        $message = $result['created']
+            ? __('portal.admin_publish_success', ['locale' => $locale->code, 'number' => $result['number']])
+            : __('portal.admin_update_success', ['locale' => $locale->code, 'number' => $result['number']]);
+
         return back()
-            ->with('status', __('portal.admin_publish_success', ['locale' => $locale->code]))
-            ->with('published_pr_url', $url);
+            ->with('status', $message)
+            ->with('published_pr_url', $result['url'])
+            ->with('published_pr_number', $result['number']);
     }
 }
