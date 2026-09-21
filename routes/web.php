@@ -4,7 +4,9 @@ use App\Http\Controllers\AdminTranslationController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\RegistrationController;
 use App\Http\Controllers\TranslationController;
+use App\Http\Controllers\TranslationReviewController;
 use App\Http\Middleware\RequirePortalAdmin;
+use App\Http\Middleware\RequirePortalReviewer;
 use App\Http\Middleware\SetPortalLocale;
 use Illuminate\Support\Facades\Route;
 
@@ -26,6 +28,11 @@ Route::middleware([SetPortalLocale::class])->group(function () {
         Route::get('/traducoes',[TranslationController::class,'index'])->name('translations.index');
         Route::post('/traducoes/{source}',[TranslationController::class,'store'])->name('translations.store');
         Route::get('/traducoes-exportar',[TranslationController::class,'export'])->name('translations.export');
+
+        Route::prefix('revisao')->middleware(RequirePortalReviewer::class)->group(function () {
+            Route::get('/traducoes',[TranslationReviewController::class,'index'])->name('review.translations.index');
+            Route::post('/traducoes/{translation}',[TranslationReviewController::class,'update'])->name('review.translations.update');
+        });
 
         Route::prefix('admin')->middleware(RequirePortalAdmin::class)->group(function () {
             Route::get('/traducoes',[AdminTranslationController::class,'index'])->name('admin.translations.index');

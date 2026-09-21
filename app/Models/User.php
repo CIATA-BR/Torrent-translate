@@ -37,9 +37,32 @@ class User extends Authenticatable
 
     public function isPortalAdmin(): bool
     {
+        return $this->emailInConfig('torrent.admin_emails');
+    }
+
+    public function isPortalReviewer(): bool
+    {
+        return $this->isPortalAdmin() || $this->emailInConfig('torrent.reviewer_emails');
+    }
+
+    public function portalRole(): string
+    {
+        if ($this->isPortalAdmin()) {
+            return 'admin';
+        }
+
+        if ($this->isPortalReviewer()) {
+            return 'reviewer';
+        }
+
+        return 'translator';
+    }
+
+    private function emailInConfig(string $key): bool
+    {
         $email = strtolower(trim((string) $this->email));
 
-        return collect(config('torrent.admin_emails', []))
+        return collect(config($key, []))
             ->map(fn ($value) => strtolower(trim((string) $value)))
             ->filter()
             ->contains($email);
