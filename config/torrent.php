@@ -13,4 +13,13 @@ return [
             FILTER_NULL_ON_FAILURE
         ) ?? true,
     ],
+
+    'github' => [
+        'token' => env('TORRENT_GITHUB_TOKEN'),
+        'repository' => env('TORRENT_GITHUB_REPOSITORY', 'CIATA-BR/SerrebiTorrent'),
+        'source_ref' => env('TORRENT_GITHUB_SOURCE_REF', 'weblate-bootstrap'),
+        'publish_base' => env('TORRENT_GITHUB_PUBLISH_BASE', 'main'),
+        'pot_path' => env('TORRENT_GITHUB_POT_PATH', 'locales/serrebitorrent.pot'),
+        'locales_path' => env('TORRENT_GITHUB_LOCALES_PATH', 'locales'),
+    ],
 ];
