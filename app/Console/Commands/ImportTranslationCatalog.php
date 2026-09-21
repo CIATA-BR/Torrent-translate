@@ -72,14 +72,22 @@ class ImportTranslationCatalog extends Command
     private function parsePot(string $contents): array
     {
         $entries = [];
-        $blocks = preg_split('/\R{2,}/', trim($contents)) ?: [];
+        $lines = preg_split('/\R/', $contents) ?: [];
 
-        foreach ($blocks as $block) {
-            if (! preg_match('/^msgid\s+"((?:\\.|[^"\\])*)"/m', $block, $match)) {
+        foreach ($lines as $line) {
+            $line = trim($line);
+
+            if (! str_starts_with($line, 'msgid "') || ! str_ends_with($line, '"')) {
                 continue;
             }
 
-            $value = stripcslashes($match[1]);
+            $encoded = substr($line, 7, -1);
+
+            if ($encoded === '') {
+                continue;
+            }
+
+            $value = stripcslashes($encoded);
 
             if ($value !== '') {
                 $entries[] = $value;
