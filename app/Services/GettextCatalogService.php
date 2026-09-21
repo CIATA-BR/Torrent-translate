@@ -19,39 +19,44 @@ class GettextCatalogService
     {
         $entries = [];
         $current = null;
-        $collecting = false;
+        $state = null;
+
+        $flushMsgid = function () use (&$entries, &$current): void {
+            if ($current !== null && $current !== '') {
+                $entries[] = $current;
+            }
+
+            $current = null;
+        };
 
         foreach (preg_split('/\R/', $contents) ?: [] as $line) {
             $trimmed = trim($line);
 
             if (str_starts_with($trimmed, 'msgid ')) {
-                if ($collecting && $current !== null && $current !== '') {
-                    $entries[] = $current;
-                }
-
+                $flushMsgid();
                 $current = $this->decodeQuoted(substr($trimmed, 6));
-                $collecting = true;
+                $state = 'msgid';
                 continue;
             }
 
-            if ($collecting && str_starts_with($trimmed, '"')) {
+            if (str_starts_with($trimmed, 'msgstr ')) {
+                $flushMsgid();
+                $state = 'msgstr';
+                continue;
+            }
+
+            if ($state === 'msgid' && str_starts_with($trimmed, '"')) {
                 $current .= $this->decodeQuoted($trimmed);
                 continue;
             }
 
-            if ($collecting && $trimmed === '') {
-                if ($current !== null && $current !== '') {
-                    $entries[] = $current;
-                }
-
-                $current = null;
-                $collecting = false;
+            if ($trimmed === '') {
+                $flushMsgid();
+                $state = null;
             }
         }
 
-        if ($collecting && $current !== null && $current !== '') {
-            $entries[] = $current;
-        }
+        $flushMsgid();
 
         return array_values(array_unique($entries));
     }
