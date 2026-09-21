@@ -1,22 +1,19 @@
 @extends('layouts.app')
-@section('title','Criar conta')
+@section('title', __('portal.create_account'))
 @section('content')
 @if(session('registration_email_sent'))
-<h1>Confira seu e-mail</h1>
+<h1>{{ __('portal.registration_sent_title') }}</h1>
 <div class="alert success" role="status" aria-live="polite">
-    <p>Enviamos um link de confirmação para <strong>{{ session('registration_email') }}</strong>.</p>
-    <p>O link expira em 30 minutos.</p>
+<p>{{ __('portal.registration_sent', ['email' => session('registration_email')]) }}</p>
+<p>{{ __('portal.registration_expires') }}</p>
 </div>
-<p><a href="{{ url('/') }}">Voltar para o início</a></p>
+<p><a href="{{ url('/') }}">{{ __('portal.back_home') }}</a></p>
 @else
-<h1>Criar conta</h1>
+<h1>{{ __('portal.create_account') }}</h1>
 <p>Informe seu e-mail. Enviaremos um link seguro para concluir o cadastro.</p>
 <form method="post" action="{{ route('register.send') }}">
 @csrf
-<div class="field">
-<label for="email">E-mail</label>
-<input id="email" name="email" type="email" autocomplete="email" required value="{{ old('email') }}">
-</div>
+<div class="field"><label for="email">{{ __('portal.email') }}</label><input id="email" name="email" type="email" autocomplete="email" required value="{{ old('email') }}"></div>
 <button type="submit">Enviar link de confirmação</button>
 </form>
 @endif
