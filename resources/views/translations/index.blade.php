@@ -62,10 +62,19 @@ $locked = filled($targetTranslation?->text) && $editId !== $source->id;
 <textarea id="source-{{ $source->id }}" rows="4" readonly lang="{{ $sourceLanguage === 'pt-BR' ? 'pt-BR' : 'en-US' }}">{{ $sourceText }}</textarea>
 </div>
 
-<form method="post" action="{{ route('translations.store', $source) }}">
+<form method="post" action="{{ route('translations.store', $source) }}" class="translation-form">
 @csrf
 <input type="hidden" name="target_locale" value="{{ $targetLocale->id }}">
 <input type="hidden" name="source_lang" value="{{ $sourceLanguage }}">
+@if($filter !== '')
+<input type="hidden" name="filter" value="{{ $filter }}">
+@endif
+@if($search !== '')
+<input type="hidden" name="q" value="{{ $search }}">
+@endif
+@if(request()->integer('page') > 1)
+<input type="hidden" name="page" value="{{ request()->integer('page') }}">
+@endif
 
 <div class="field">
 <label for="text-{{ $source->id }}">{{ __('portal.translation') }}</label>
@@ -75,7 +84,7 @@ $locked = filled($targetTranslation?->text) && $editId !== $source->id;
 @if($locked)
 <a href="{{ request()->fullUrlWithQuery(['edit' => $source->id]) }}">{{ __('portal.change') }}</a>
 @else
-<button type="submit">{{ __('portal.save') }}</button>
+<button type="submit" class="save-translation" @disabled(blank(old('text', $targetTranslation?->text)))>{{ __('portal.save') }}</button>
 @if(filled($targetTranslation?->text))
 <a href="{{ request()->fullUrlWithQuery(['edit' => null]) }}">{{ __('portal.cancel_change') }}</a>
 @endif
@@ -87,4 +96,22 @@ $locked = filled($targetTranslation?->text) && $editId !== $source->id;
 @endforelse
 
 {{ $sources->links() }}
+
+<script>
+document.querySelectorAll('.translation-form').forEach((form) => {
+    const textarea = form.querySelector('textarea[name="text"]');
+    const button = form.querySelector('.save-translation');
+
+    if (!textarea || !button) {
+        return;
+    }
+
+    const syncButton = () => {
+        button.disabled = textarea.value.trim() === '';
+    };
+
+    textarea.addEventListener('input', syncButton);
+    syncButton();
+});
+</script>
 @endsection
