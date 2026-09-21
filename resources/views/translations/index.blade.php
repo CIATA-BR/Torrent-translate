@@ -57,6 +57,12 @@ $targetTranslation = $source->translations->firstWhere('locale_id', $targetLocal
 $ptTranslation = $ptBr ? $source->translations->firstWhere('locale_id', $ptBr->id) : null;
 $sourceText = $sourceLanguage === 'pt-BR' ? $ptTranslation?->text : $source->msgid;
 $locked = filled($targetTranslation?->text) && $editId !== $source->id;
+$statusKey = match($targetTranslation?->status) {
+    'approved' => 'portal.status_approved',
+    'pending_review' => 'portal.status_pending_review',
+    'rejected' => 'portal.status_rejected',
+    default => null,
+};
 @endphp
 <article class="translation-card">
 <h2>{{ __('portal.translation') }} {{ $source->id }}</h2>
@@ -78,6 +84,10 @@ $locked = filled($targetTranslation?->text) && $editId !== $source->id;
 @endif
 @if(request()->integer('page') > 1)
 <input type="hidden" name="page" value="{{ request()->integer('page') }}">
+@endif
+
+@if($statusKey)
+<p><strong>{{ __('portal.review_status') }}:</strong> {{ __($statusKey) }}</p>
 @endif
 
 <div class="field">

@@ -40,6 +40,7 @@ class TranslationController extends Controller
             abort_unless($ptBr, 503, 'O catálogo pt-BR ainda não foi importado.');
             $available->whereHas('translations', fn ($q) => $q
                 ->where('locale_id', $ptBr->id)
+                ->where('status', 'approved')
                 ->whereNotNull('text')
                 ->where('text', '<>', ''));
         }
@@ -124,7 +125,7 @@ class TranslationController extends Controller
         $translation->fill([
             'updated_by' => $user->id,
             'text' => $text,
-            'status' => 'approved',
+            'status' => 'pending_review',
         ])->save();
 
         TranslationRevision::query()->create([
@@ -177,7 +178,9 @@ class TranslationController extends Controller
 
         $sources = TranslationSource::query()
             ->where('active', true)
-            ->with(['translations' => fn ($q) => $q->where('locale_id', $locale->id)])
+            ->with(['translations' => fn ($q) => $q
+                ->where('locale_id', $locale->id)
+                ->where('status', 'approved')])
             ->orderBy('id')
             ->get();
 
@@ -241,6 +244,8 @@ class TranslationController extends Controller
 
         $total = $sources->count();
         $translated = 0;
+        $approved = 0;
+        $pendingReview = 0;
         $invalid = 0;
 
         foreach ($sources as $source) {
@@ -252,6 +257,13 @@ class TranslationController extends Controller
 
             $translated++;
 
+            $translation = $source->translations->first();
+            if ($translation?->status === 'approved') {
+                $approved++;
+            } else {
+                $pendingReview++;
+            }
+
             if ($this->validator->validate($source->msgid, $text) !== []) {
                 $invalid++;
             }
@@ -260,9 +272,11 @@ class TranslationController extends Controller
         return [
             'total' => $total,
             'translated' => $translated,
+            'approved' => $approved,
+            'pendingReview' => $pendingReview,
             'invalid' => $invalid,
             'percent' => $total > 0 ? (int) floor(($translated / $total) * 100) : 0,
-            'publishable' => $total > 0 && $translated === $total && $invalid === 0,
+            'publishable' => $total > 0 && $approved === $total && $invalid === 0,
         ];
     }
 

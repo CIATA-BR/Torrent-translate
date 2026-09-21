@@ -50,7 +50,9 @@ class TranslationPoService
     {
         $sources = TranslationSource::query()
             ->where('active', true)
-            ->with(['translations' => fn ($q) => $q->where('locale_id', $locale->id)])
+            ->with(['translations' => fn ($q) => $q
+                ->where('locale_id', $locale->id)
+                ->where('status', 'approved')])
             ->orderBy('id')
             ->get();
 

@@ -55,6 +55,8 @@ class AdminTranslationController extends Controller
 
         $locales = $localeModels->map(function (Locale $locale) use ($sources, $total, $openPullRequests) {
             $translated = 0;
+            $approved = 0;
+            $pendingReview = 0;
             $invalid = 0;
 
             foreach ($sources as $source) {
@@ -67,6 +69,12 @@ class AdminTranslationController extends Controller
 
                 $translated++;
 
+                if ($translation?->status === 'approved') {
+                    $approved++;
+                } else {
+                    $pendingReview++;
+                }
+
                 if ($this->validator->validate($source->msgid, $text) !== []) {
                     $invalid++;
                 }
@@ -77,10 +85,12 @@ class AdminTranslationController extends Controller
             return [
                 'locale' => $locale,
                 'translated' => $translated,
+                'approved' => $approved,
+                'pending_review' => $pendingReview,
                 'total' => $total,
                 'percent' => $percent,
                 'invalid' => $invalid,
-                'publishable' => $total > 0 && $translated === $total && $invalid === 0,
+                'publishable' => $total > 0 && $approved === $total && $invalid === 0,
                 'pull_request' => $openPullRequests[$locale->code] ?? null,
             ];
         });
