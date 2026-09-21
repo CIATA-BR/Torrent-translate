@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\MicrosoftGraphMailService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -97,9 +98,6 @@ class RegistrationController extends Controller
 
     public function complete(Request $request, string $token)
     {
-        $record = $this->validToken($token);
-        abort_unless($record, 410, 'Link inválido ou expirado.');
-
         $data = $request->validate([
             'full_name' => ['required', 'string', 'max:255'],
             'country_id' => ['required', 'exists:countries,id'],
@@ -107,36 +105,52 @@ class RegistrationController extends Controller
             'password' => ['required', 'confirmed', 'min:12'],
         ]);
 
-        abort_if(
-            User::where('email', $record->email)->exists(),
-            422,
-            'Este e-mail já está cadastrado.'
-        );
+        $tokenHash = hash('sha256', $token);
 
-        $country = Country::findOrFail($data['country_id']);
-        $language = Language::findOrFail($data['language_id']);
-        $localeCode = strtolower($language->code).'-'.strtoupper($country->iso2);
+        $user = DB::transaction(function () use ($data, $tokenHash): User {
+            $record = RegistrationToken::query()
+                ->where('token_hash', $tokenHash)
+                ->whereNull('used_at')
+                ->where('expires_at', '>', now())
+                ->lockForUpdate()
+                ->first();
 
-        $locale = Locale::firstOrCreate(
-            ['code' => $localeCode],
-            [
-                'country_id' => $country->id,
-                'language_id' => $language->id,
-                'name' => $language->name.' — '.$country->name,
-                'active' => true,
-            ]
-        );
+            abort_unless($record, 410, 'Link inválido ou expirado.');
 
-        $user = User::create([
-            'name' => $data['full_name'],
-            'full_name' => $data['full_name'],
-            'email' => $record->email,
-            'email_verified_at' => now(),
-            'locale_id' => $locale->id,
-            'password' => Hash::make($data['password']),
-        ]);
+            abort_if(
+                User::query()->whereRaw('LOWER(email) = ?', [strtolower($record->email)])->exists(),
+                422,
+                'Este e-mail já está cadastrado.'
+            );
 
-        $record->update(['used_at' => now()]);
+            $country = Country::query()->findOrFail($data['country_id']);
+            $language = Language::query()->findOrFail($data['language_id']);
+            $localeCode = strtolower($language->code).'-'.strtoupper($country->iso2);
+
+            $locale = Locale::query()->firstOrCreate(
+                ['code' => $localeCode],
+                [
+                    'country_id' => $country->id,
+                    'language_id' => $language->id,
+                    'name' => $language->name.' — '.$country->name,
+                    'active' => true,
+                ]
+            );
+
+            $user = User::query()->create([
+                'name' => $data['full_name'],
+                'full_name' => $data['full_name'],
+                'email' => strtolower(trim($record->email)),
+                'email_verified_at' => now(),
+                'locale_id' => $locale->id,
+                'password' => Hash::make($data['password']),
+            ]);
+
+            $record->update(['used_at' => now()]);
+
+            return $user;
+        });
+
         Auth::login($user);
 
         return redirect()
