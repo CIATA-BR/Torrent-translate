@@ -72,7 +72,10 @@ class RegistrationController extends Controller
                 ]);
         }
 
-        return back()->with('status', 'Enviamos um link de confirmação para o e-mail informado.');
+        return redirect()
+            ->route('register.request')
+            ->with('registration_email_sent', true)
+            ->with('registration_email', $data['email']);
     }
 
     public function completeForm(string $token)
@@ -80,11 +83,15 @@ class RegistrationController extends Controller
         $record = $this->validToken($token);
         abort_unless($record, 410, 'Link inválido ou expirado.');
 
+        $countries = Country::orderBy('name')->get();
+        $languages = Language::orderBy('name')->get();
+
         return view('auth.complete-registration', [
             'token' => $token,
             'email' => $record->email,
-            'countries' => Country::orderBy('name')->get(),
-            'languages' => Language::orderBy('name')->get(),
+            'countries' => $countries,
+            'languages' => $languages,
+            'referenceDataMissing' => $countries->isEmpty() || $languages->isEmpty(),
         ]);
     }
 
