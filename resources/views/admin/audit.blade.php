@@ -6,26 +6,47 @@
 <p>{{ __('portal.audit_help') }}</p>
 
 <form method="get" class="filters">
-<div class="field">
-<label for="event">{{ __('portal.audit_event_filter') }}</label>
-<input id="event" name="event" type="search" value="{{ $eventFilter }}" placeholder="translation.approved">
-</div>
+<x-text-field
+    id="event"
+    name="event"
+    type="search"
+    :label="__('portal.audit_event_filter')"
+    :value="$eventFilter"
+    placeholder="translation.approved"
+/>
 <button type="submit">{{ __('portal.apply_filters') }}</button>
 </form>
 
 <section aria-labelledby="events-heading">
 <h2 id="events-heading">{{ __('portal.audit_events') }}</h2>
+<div class="ciata-table-wrap" tabindex="0" role="region" aria-label="{{ __('portal.audit_events_table_label') }}">
+<table class="ciata-table">
+<thead>
+<tr>
+<th scope="col">{{ __('portal.audit_when') }}</th>
+<th scope="col">{{ __('portal.audit_event') }}</th>
+<th scope="col">{{ __('portal.audit_actor') }}</th>
+<th scope="col">{{ __('portal.audit_subject') }}</th>
+<th scope="col">{{ __('portal.audit_details') }}</th>
+</tr>
+</thead>
+<tbody>
 @forelse($events as $event)
-<article class="translation-card">
-<h3>{{ $event->event }}</h3>
-<p><strong>{{ __('portal.audit_when') }}:</strong> {{ $event->created_at?->format('Y-m-d H:i:s') }}</p>
-<p><strong>{{ __('portal.audit_actor') }}:</strong> {{ $event->user?->full_name ?: $event->user?->email ?: __('portal.audit_system') }}</p>
+<tr>
+<td>{{ $event->created_at?->format('Y-m-d H:i:s') }}</td>
+<td><code>{{ $event->event }}</code></td>
+<td>{{ $event->user?->full_name ?: $event->user?->email ?: __('portal.audit_system') }}</td>
+<td>
 @if($event->subject_type)
-<p><strong>{{ __('portal.audit_subject') }}:</strong> {{ class_basename($event->subject_type) }} #{{ $event->subject_id }}</p>
+{{ class_basename($event->subject_type) }} #{{ $event->subject_id }}
+@else
+—
 @endif
+</td>
+<td>
 @if(is_array($event->metadata) && $event->metadata !== [])
 <details>
-<summary>{{ __('portal.audit_details') }}</summary>
+<summary>{{ __('portal.audit_open_details') }}</summary>
 <dl>
 @foreach($event->metadata as $key => $value)
 <dt>{{ $key }}</dt>
@@ -33,47 +54,67 @@
 @endforeach
 </dl>
 </details>
+@else
+—
 @endif
-</article>
+</td>
+</tr>
 @empty
-<p>{{ __('portal.audit_none') }}</p>
+<tr><td colspan="5">{{ __('portal.audit_none') }}</td></tr>
 @endforelse
+</tbody>
+</table>
+</div>
 {{ $events->links() }}
 </section>
 
 <section aria-labelledby="history-heading">
 <h2 id="history-heading">{{ __('portal.history_title') }}</h2>
+<div class="ciata-table-wrap" tabindex="0" role="region" aria-label="{{ __('portal.history_table_label') }}">
+<table class="ciata-table">
+<thead>
+<tr>
+<th scope="col">{{ __('portal.audit_when') }}</th>
+<th scope="col">{{ __('portal.audit_actor') }}</th>
+<th scope="col">{{ __('portal.admin_locale') }}</th>
+<th scope="col">{{ __('portal.original_text') }}</th>
+<th scope="col">{{ __('portal.history_status') }}</th>
+<th scope="col">{{ __('portal.history_previous_text') }}</th>
+<th scope="col">{{ __('portal.history_new_text') }}</th>
+</tr>
+</thead>
+<tbody>
 @forelse($revisions as $revision)
-<article class="translation-card">
-<h3>
-{{ __('portal.translation') }}
-{{ $revision->translation?->source?->id }}
-@if($revision->translation?->locale)
-— {{ $revision->translation->locale->name }} ({{ $revision->translation->locale->code }})
-@endif
-</h3>
-<p><strong>{{ __('portal.audit_when') }}:</strong> {{ $revision->created_at?->format('Y-m-d H:i:s') }}</p>
-<p><strong>{{ __('portal.audit_actor') }}:</strong> {{ $revision->user?->full_name ?: $revision->user?->email ?: __('portal.audit_system') }}</p>
-<p><strong>{{ __('portal.history_status') }}:</strong> {{ $revision->old_status ?: '—' }} → {{ $revision->new_status ?: '—' }}</p>
-
-<div class="field">
-<label for="history-source-{{ $revision->id }}">{{ __('portal.original_text') }}</label>
-<textarea id="history-source-{{ $revision->id }}" rows="3" readonly lang="en-US">{{ $revision->translation?->source?->msgid }}</textarea>
-</div>
-
-<div class="field">
-<label for="history-old-{{ $revision->id }}">{{ __('portal.history_previous_text') }}</label>
-<textarea id="history-old-{{ $revision->id }}" rows="3" readonly>{{ $revision->old_text }}</textarea>
-</div>
-
-<div class="field">
-<label for="history-new-{{ $revision->id }}">{{ __('portal.history_new_text') }}</label>
-<textarea id="history-new-{{ $revision->id }}" rows="3" readonly>{{ $revision->new_text }}</textarea>
-</div>
-</article>
+<tr>
+<td>{{ $revision->created_at?->format('Y-m-d H:i:s') }}</td>
+<td>{{ $revision->user?->full_name ?: $revision->user?->email ?: __('portal.audit_system') }}</td>
+<td>{{ $revision->translation?->locale?->code ?: '—' }}</td>
+<td>
+<details>
+<summary>{{ __('portal.audit_open_text') }}</summary>
+<p lang="en-US">{{ $revision->translation?->source?->msgid }}</p>
+</details>
+</td>
+<td>{{ $revision->old_status ?: '—' }} → {{ $revision->new_status ?: '—' }}</td>
+<td>
+<details>
+<summary>{{ __('portal.audit_open_text') }}</summary>
+<p>{{ $revision->old_text }}</p>
+</details>
+</td>
+<td>
+<details>
+<summary>{{ __('portal.audit_open_text') }}</summary>
+<p>{{ $revision->new_text }}</p>
+</details>
+</td>
+</tr>
 @empty
-<p>{{ __('portal.history_none') }}</p>
+<tr><td colspan="7">{{ __('portal.history_none') }}</td></tr>
 @endforelse
+</tbody>
+</table>
+</div>
 {{ $revisions->links() }}
 </section>
 @endsection

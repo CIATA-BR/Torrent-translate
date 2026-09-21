@@ -74,7 +74,9 @@ class PasswordResetController extends Controller
             }
         }
 
-        return back()->with('status', __('portal.password_reset_link_sent'));
+        return redirect()
+            ->route('password.request')
+            ->with('password_reset_email_sent', true);
     }
 
     public function resetForm(string $token)
