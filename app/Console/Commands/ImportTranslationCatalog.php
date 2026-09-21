@@ -7,6 +7,7 @@ use App\Models\Language;
 use App\Models\Locale;
 use App\Models\Translation;
 use App\Models\TranslationSource;
+use App\Services\GettextCatalogService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -15,7 +16,7 @@ class ImportTranslationCatalog extends Command
     protected $signature = 'translations:import-catalog';
     protected $description = 'Importa o catálogo inglês do SerrebiTorrent e as traduções pt-BR já existentes.';
 
-    public function handle(): int
+    public function handle(GettextCatalogService $catalog): int
     {
         $potPath = resource_path('translation_catalog/serrebitorrent.pot');
         $ptPath = resource_path('translation_catalog/pt-BR.json');
@@ -25,8 +26,22 @@ class ImportTranslationCatalog extends Command
             return self::FAILURE;
         }
 
-        $english = $this->parsePot((string) file_get_contents($potPath));
-        $portuguese = json_decode((string) file_get_contents($ptPath), true, flags: JSON_THROW_ON_ERROR);
+        try {
+            $english = $catalog->parsePotFile($potPath);
+            $portuguese = json_decode(
+                (string) file_get_contents($ptPath),
+                true,
+                flags: JSON_THROW_ON_ERROR
+            );
+        } catch (\Throwable $e) {
+            $this->error($e->getMessage());
+            return self::FAILURE;
+        }
+
+        if (! is_array($portuguese)) {
+            $this->error('Catálogo pt-BR inválido.');
+            return self::FAILURE;
+        }
 
         $br = Country::query()->where('iso2', 'BR')->firstOrFail();
         $us = Country::query()->where('iso2', 'US')->firstOrFail();
@@ -57,43 +72,15 @@ class ImportTranslationCatalog extends Command
                 if (is_string($translated) && trim($translated) !== '') {
                     Translation::query()->updateOrCreate(
                         ['translation_source_id' => $source->id, 'locale_id' => $ptBr->id],
-                        ['text' => $translated, 'status' => 'approved', 'updated_by' => null]
+                        ['text' => trim($translated), 'status' => 'approved', 'updated_by' => null]
                     );
                 }
             }
         });
 
         $this->info(count($english).' termos em inglês importados.');
-        $this->info(count($portuguese).' traduções pt-BR existentes importadas.');
+        $this->info(count($portuguese).' entradas pt-BR disponíveis no arquivo de origem.');
 
         return self::SUCCESS;
-    }
-
-    private function parsePot(string $contents): array
-    {
-        $entries = [];
-        $lines = preg_split('/\R/', $contents) ?: [];
-
-        foreach ($lines as $line) {
-            $line = trim($line);
-
-            if (! str_starts_with($line, 'msgid "') || ! str_ends_with($line, '"')) {
-                continue;
-            }
-
-            $encoded = substr($line, 7, -1);
-
-            if ($encoded === '') {
-                continue;
-            }
-
-            $value = stripcslashes($encoded);
-
-            if ($value !== '') {
-                $entries[] = $value;
-            }
-        }
-
-        return array_values(array_unique($entries));
     }
 }

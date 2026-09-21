@@ -10,7 +10,7 @@ use Illuminate\Console\Command;
 class PublishTranslationToGitHub extends Command
 {
     protected $signature = 'translations:publish {locale : Locale, ex.: es-PY} {--base= : Branch base do PR}';
-    protected $description = 'Gera o PO concluído, publica em uma branch e abre PR no SerrebiTorrent.';
+    protected $description = 'Gera os artefatos concluídos, publica em uma branch e abre ou atualiza PR no SerrebiTorrent.';
 
     public function handle(
         TranslationPoService $po,
@@ -25,10 +25,13 @@ class PublishTranslationToGitHub extends Command
         }
 
         try {
-            $contents = $po->build($locale);
-            $url = $github->publishPo(
+            $poContents = $po->build($locale);
+            $webCatalogContents = $po->buildWebCatalog($locale);
+            $result = $github->publishTranslation(
                 $locale->code,
-                $contents,
+                $locale->name,
+                $poContents,
+                $webCatalogContents,
                 $this->option('base') ?: null
             );
         } catch (\Throwable $e) {
@@ -36,8 +39,12 @@ class PublishTranslationToGitHub extends Command
             return self::FAILURE;
         }
 
-        $this->info('Tradução publicada e PR aberto.');
-        $this->line($url);
+        $this->info(
+            $result['created']
+                ? 'Tradução publicada e PR aberto.'
+                : 'PR de tradução existente atualizado.'
+        );
+        $this->line('#'.$result['number'].' '.$result['url']);
 
         return self::SUCCESS;
     }

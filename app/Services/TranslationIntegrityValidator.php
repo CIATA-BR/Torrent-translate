@@ -68,7 +68,14 @@ class TranslationIntegrityValidator
 
     private function namedPlaceholders(string $text): array
     {
-        preg_match_all('/\{[A-Za-z_][A-Za-z0-9_]*(?::[^{}]+)?\}/u', $text, $matches);
+        $withoutEscapedBraces = str_replace(['{{', '}}'], ['', ''], $text);
+
+        preg_match_all(
+            '/\{(?:[A-Za-z_][A-Za-z0-9_]*|\d+)(?:![rsa])?(?::[^{}]+)?\}/u',
+            $withoutEscapedBraces,
+            $matches
+        );
+
         $values = $matches[0] ?? [];
         sort($values);
 
@@ -78,7 +85,13 @@ class TranslationIntegrityValidator
     private function printfPlaceholders(string $text): array
     {
         $withoutEscapedPercent = str_replace('%%', '', $text);
-        preg_match_all('/%(?:\d+\$)?[-+0 #]*\d*(?:\.\d+)?[bcdeEfFgGosuxX]/', $withoutEscapedPercent, $matches);
+
+        preg_match_all(
+            '/%(?:\([A-Za-z_][A-Za-z0-9_]*\))?(?:\d+\$)?[-+0 #]*\d*(?:\.\d+)?[diouxXeEfFgGcrsab]/',
+            $withoutEscapedPercent,
+            $matches
+        );
+
         $values = $matches[0] ?? [];
         sort($values);
 
