@@ -9,6 +9,7 @@ use App\Models\TranslationSource;
 use App\Services\AuditTrail;
 use App\Services\TranslationIntegrityValidator;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -123,51 +124,61 @@ class TranslationController extends Controller
             ]);
         }
 
-        $translation = Translation::query()->firstOrNew([
-            'translation_source_id' => $source->id,
-            'locale_id' => (int) $data['target_locale'],
-        ]);
+        $translation = DB::transaction(function () use ($data, $source, $text, $user): Translation {
+            $translation = Translation::query()
+                ->where('translation_source_id', $source->id)
+                ->where('locale_id', (int) $data['target_locale'])
+                ->lockForUpdate()
+                ->first();
 
-        if ($translation->exists) {
-            $currentVersion = $translation->updated_at?->toISOString();
+            if ($translation) {
+                $currentVersion = $translation->updated_at?->toISOString();
 
-            if (filled($data['version'] ?? null) && $currentVersion !== $data['version']) {
-                throw ValidationException::withMessages([
-                    'text' => [__('portal.translation_changed_reload')],
+                if (filled($data['version'] ?? null) && $currentVersion !== $data['version']) {
+                    throw ValidationException::withMessages([
+                        'text' => [__('portal.translation_changed_reload')],
+                    ]);
+                }
+            } else {
+                $translation = new Translation([
+                    'translation_source_id' => $source->id,
+                    'locale_id' => (int) $data['target_locale'],
                 ]);
             }
-        }
 
-        $oldText = $translation->text;
-        $oldStatus = $translation->status;
+            $oldText = $translation->text;
+            $oldStatus = $translation->status;
 
-        $translation->fill([
-            'updated_by' => $user->id,
-            'text' => $text,
-            'status' => 'pending_review',
-        ])->save();
+            $translation->fill([
+                'updated_by' => $user->id,
+                'text' => $text,
+                'status' => 'pending_review',
+            ])->save();
 
-        TranslationRevision::query()->create([
-            'translation_id' => $translation->id,
-            'user_id' => $user->id,
-            'old_text' => $oldText,
-            'new_text' => $translation->text,
-            'old_status' => $oldStatus,
-            'new_status' => $translation->status,
-        ]);
-
-        $this->audit->record(
-            'translation.submitted',
-            $user,
-            Translation::class,
-            $translation->id,
-            [
-                'source_id' => $source->id,
-                'locale_id' => (int) $data['target_locale'],
+            TranslationRevision::query()->create([
+                'translation_id' => $translation->id,
+                'user_id' => $user->id,
+                'old_text' => $oldText,
+                'new_text' => $translation->text,
                 'old_status' => $oldStatus,
                 'new_status' => $translation->status,
-            ]
-        );
+            ]);
+
+            $this->audit->record(
+                'translation.submitted',
+                $user,
+                Translation::class,
+                $translation->id,
+                [
+                    'source_id' => $source->id,
+                    'locale_id' => (int) $data['target_locale'],
+                    'old_status' => $oldStatus,
+                    'new_status' => $translation->status,
+                ]
+            );
+
+            return $translation;
+        });
 
         $targetLocale = Locale::query()->findOrFail((int) $data['target_locale']);
         $metrics = $this->catalogMetrics($targetLocale);
