@@ -22,6 +22,7 @@ class TranslationPoService
         $output .= '"Project-Id-Version: SerrebiTorrent\\n"'."\n";
         $output .= '"Language: '.$this->escape($locale->code).'\\n"'."\n";
         $output .= '"X-Language-Name: '.$this->escape($locale->name).'\\n"'."\n";
+        $output .= '"X-Serrebi-Validation: strict\\n"'."\n";
         $output .= '"MIME-Version: 1.0\\n"'."\n";
         $output .= '"Content-Type: text/plain; charset=UTF-8\\n"'."\n";
         $output .= '"Content-Transfer-Encoding: 8bit\\n"'."\n\n";
