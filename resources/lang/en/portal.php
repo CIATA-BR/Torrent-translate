@@ -9,6 +9,7 @@ return [
     'english' => 'English',
     'back_home' => 'Back to home',
     'login' => 'Sign in',
+    'login_invalid' => 'Invalid email or password.',
     'logout' => 'Sign out',
     'create_account' => 'Create account',
     'email' => 'Email',

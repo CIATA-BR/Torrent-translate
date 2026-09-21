@@ -20,7 +20,7 @@ class AuthController extends Controller
         ]);
 
         if(!Auth::attempt($credentials,$request->boolean('remember'))){
-            return back()->withErrors(['email'=>'E-mail ou senha inválidos.'])->onlyInput('email');
+            return back()->withErrors(['email' => __('portal.login_invalid')])->onlyInput('email');
         }
 
         $request->session()->regenerate();

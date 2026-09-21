@@ -9,6 +9,7 @@ return [
     'english' => 'English',
     'back_home' => 'Voltar para o início',
     'login' => 'Entrar',
+    'login_invalid' => 'E-mail ou senha inválidos.',
     'logout' => 'Sair',
     'create_account' => 'Criar conta',
     'email' => 'E-mail',

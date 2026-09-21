@@ -57,6 +57,11 @@ $targetTranslation = $source->translations->firstWhere('locale_id', $targetLocal
 $ptTranslation = $ptBr ? $source->translations->firstWhere('locale_id', $ptBr->id) : null;
 $sourceText = $sourceLanguage === 'pt-BR' ? $ptTranslation?->text : $source->msgid;
 $locked = filled($targetTranslation?->text) && $editId !== $source->id;
+$submittedSourceId = (int) old('source_id');
+$fieldValue = $submittedSourceId === $source->id
+    ? old('text', $targetTranslation?->text)
+    : $targetTranslation?->text;
+$fieldError = $submittedSourceId === $source->id ? $errors->first('text') : null;
 $statusKey = match($targetTranslation?->status) {
     'approved' => 'portal.status_approved',
     'pending_review' => 'portal.status_pending_review',
@@ -74,6 +79,7 @@ $statusKey = match($targetTranslation?->status) {
 
 <form method="post" action="{{ route('translations.store', $source) }}" class="translation-form">
 @csrf
+<input type="hidden" name="source_id" value="{{ $source->id }}">
 <input type="hidden" name="target_locale" value="{{ $targetLocale->id }}">
 <input type="hidden" name="source_lang" value="{{ $sourceLanguage }}">
 @if($filter !== '')
@@ -90,15 +96,25 @@ $statusKey = match($targetTranslation?->status) {
 <p><strong>{{ __('portal.review_status') }}:</strong> {{ __($statusKey) }}</p>
 @endif
 
-<div class="field">
-<label for="text-{{ $source->id }}">{{ __('portal.translation') }}</label>
-<textarea id="text-{{ $source->id }}" name="text" rows="4" @readonly($locked) required>{{ old('text', $targetTranslation?->text) }}</textarea>
+<div class="ciata-field">
+<label class="ciata-field__label" for="text-{{ $source->id }}">{{ __('portal.translation') }} <span class="ciata-field__required">({{ __('portal.required') }})</span></label>
+<textarea
+    id="text-{{ $source->id }}"
+    name="text"
+    rows="4"
+    @readonly($locked)
+    required
+    @if($fieldError) aria-invalid="true" aria-errormessage="text-{{ $source->id }}-error" @endif
+>{{ $fieldValue }}</textarea>
+@if($fieldError)
+<div id="text-{{ $source->id }}-error" class="ciata-field__error">{{ $fieldError }}</div>
+@endif
 </div>
 
 @if($locked)
 <a href="{{ request()->fullUrlWithQuery(['edit' => $source->id]) }}">{{ __('portal.change') }}</a>
 @else
-<button type="submit" class="save-translation" @disabled(blank(old('text', $targetTranslation?->text)))>{{ __('portal.save') }}</button>
+<button type="submit" class="save-translation" @disabled(blank($fieldValue))>{{ __('portal.save') }}</button>
 @if(filled($targetTranslation?->text))
 <a href="{{ request()->fullUrlWithQuery(['edit' => null]) }}">{{ __('portal.cancel_change') }}</a>
 @endif

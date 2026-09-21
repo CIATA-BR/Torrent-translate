@@ -9,6 +9,14 @@
 <article class="translation-card">
 <h2>{{ __('portal.translation') }} {{ $translation->source->id }} — {{ $translation->locale->name }} ({{ $translation->locale->code }})</h2>
 
+@php
+$submittedTranslationId = (int) old('translation_id');
+$reviewValue = $submittedTranslationId === $translation->id
+    ? old('text', $translation->text)
+    : $translation->text;
+$reviewError = $submittedTranslationId === $translation->id ? $errors->first('text') : null;
+@endphp
+
 @if($translation->updater)
 <p>{{ __('portal.review_submitted_by', ['name' => $translation->updater->full_name ?: $translation->updater->email]) }}</p>
 @endif
@@ -20,9 +28,19 @@
 
 <form method="post" action="{{ route('review.translations.update', $translation) }}">
 @csrf
-<div class="field">
-<label for="review-text-{{ $translation->id }}">{{ __('portal.translation') }}</label>
-<textarea id="review-text-{{ $translation->id }}" name="text" rows="4" required>{{ old('text', $translation->text) }}</textarea>
+<input type="hidden" name="translation_id" value="{{ $translation->id }}">
+<div class="ciata-field">
+<label class="ciata-field__label" for="review-text-{{ $translation->id }}">{{ __('portal.translation') }} <span class="ciata-field__required">({{ __('portal.required') }})</span></label>
+<textarea
+    id="review-text-{{ $translation->id }}"
+    name="text"
+    rows="4"
+    required
+    @if($reviewError) aria-invalid="true" aria-errormessage="review-text-{{ $translation->id }}-error" @endif
+>{{ $reviewValue }}</textarea>
+@if($reviewError)
+<div id="review-text-{{ $translation->id }}-error" class="ciata-field__error">{{ $reviewError }}</div>
+@endif
 </div>
 
 <button type="submit" name="action" value="approve">{{ __('portal.review_approve') }}</button>
