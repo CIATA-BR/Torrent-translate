@@ -7,6 +7,7 @@ use App\Models\TranslationRevision;
 use App\Services\AuditTrail;
 use App\Services\TranslationIntegrityValidator;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class TranslationReviewController extends Controller
@@ -31,75 +32,83 @@ class TranslationReviewController extends Controller
 
     public function update(Request $request, Translation $translation)
     {
-        abort_unless($translation->status === 'pending_review', 409);
-
         $data = $request->validate([
             'text' => ['required', 'string'],
             'action' => ['required', 'in:approve,reject'],
             'version' => ['required', 'string', 'max:64'],
         ]);
 
-        if ($translation->updated_at?->toISOString() !== $data['version']) {
-            throw ValidationException::withMessages([
-                'text' => [__('portal.translation_changed_reload')],
-            ]);
-        }
-
         $text = trim($data['text']);
 
-        if ($data['action'] === 'approve') {
-            $issues = $this->validator->validate($translation->source->msgid, $text);
+        DB::transaction(function () use ($request, $translation, $data, $text): void {
+            $translation = Translation::query()
+                ->with('source')
+                ->lockForUpdate()
+                ->findOrFail($translation->id);
 
-            if ($issues !== []) {
-                $messages = array_map(
-                    fn (array $issue) => __($issue['key'], [
-                        'source' => $issue['source'] === '' ? __('portal.validation_none') : $issue['source'],
-                        'translation' => $issue['translation'] === '' ? __('portal.validation_none') : $issue['translation'],
-                    ]),
-                    $issues
-                );
+            abort_unless($translation->status === 'pending_review', 409);
 
-                throw ValidationException::withMessages(['text' => $messages]);
+            if ($translation->updated_at?->toISOString() !== $data['version']) {
+                throw ValidationException::withMessages([
+                    'text' => [__('portal.translation_changed_reload')],
+                ]);
             }
-        }
 
-        $oldText = $translation->text;
-        $oldStatus = $translation->status;
-        $newStatus = $data['action'] === 'approve' ? 'approved' : 'rejected';
+            if ($data['action'] === 'approve') {
+                $issues = $this->validator->validate($translation->source->msgid, $text);
 
-        $translation->fill([
-            'updated_by' => $request->user()->id,
-            'text' => $text,
-            'status' => $newStatus,
-        ])->save();
+                if ($issues !== []) {
+                    $messages = array_map(
+                        fn (array $issue) => __($issue['key'], [
+                            'source' => $issue['source'] === '' ? __('portal.validation_none') : $issue['source'],
+                            'translation' => $issue['translation'] === '' ? __('portal.validation_none') : $issue['translation'],
+                        ]),
+                        $issues
+                    );
 
-        TranslationRevision::query()->create([
-            'translation_id' => $translation->id,
-            'user_id' => $request->user()->id,
-            'old_text' => $oldText,
-            'new_text' => $translation->text,
-            'old_status' => $oldStatus,
-            'new_status' => $newStatus,
-        ]);
+                    throw ValidationException::withMessages(['text' => $messages]);
+                }
+            }
 
-        $this->audit->record(
-            $newStatus === 'approved' ? 'translation.approved' : 'translation.rejected',
-            $request->user(),
-            Translation::class,
-            $translation->id,
-            [
-                'source_id' => $translation->translation_source_id,
-                'locale_id' => $translation->locale_id,
+            $oldText = $translation->text;
+            $oldStatus = $translation->status;
+            $newStatus = $data['action'] === 'approve' ? 'approved' : 'rejected';
+
+            $translation->fill([
+                'updated_by' => $request->user()->id,
+                'text' => $text,
+                'status' => $newStatus,
+            ])->save();
+
+            TranslationRevision::query()->create([
+                'translation_id' => $translation->id,
+                'user_id' => $request->user()->id,
+                'old_text' => $oldText,
+                'new_text' => $translation->text,
                 'old_status' => $oldStatus,
                 'new_status' => $newStatus,
-            ]
-        );
+            ]);
+
+            $this->audit->record(
+                $newStatus === 'approved' ? 'translation.approved' : 'translation.rejected',
+                $request->user(),
+                Translation::class,
+                $translation->id,
+                [
+                    'source_id' => $translation->translation_source_id,
+                    'locale_id' => $translation->locale_id,
+                    'old_status' => $oldStatus,
+                    'new_status' => $newStatus,
+                ]
+            );
+        });
 
         return back()->with(
             'status',
-            $newStatus === 'approved'
+            $data['action'] === 'approve'
                 ? __('portal.review_approved')
                 : __('portal.review_rejected')
         );
     }
+
 }
