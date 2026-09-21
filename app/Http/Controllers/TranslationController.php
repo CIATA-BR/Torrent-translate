@@ -6,11 +6,18 @@ use App\Models\Locale;
 use App\Models\Translation;
 use App\Models\TranslationRevision;
 use App\Models\TranslationSource;
+use App\Services\TranslationIntegrityValidator;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TranslationController extends Controller
 {
+    public function __construct(
+        protected TranslationIntegrityValidator $validator
+    ) {}
+
     public function index(Request $request)
     {
         $user = $request->user();
@@ -104,6 +111,23 @@ class TranslationController extends Controller
             'page' => ['nullable', 'integer', 'min:1'],
         ]);
 
+        $text = trim($data['text']);
+        $issues = $this->validator->validate($source->msgid, $text);
+
+        if ($issues !== []) {
+            $messages = array_map(
+                fn (array $issue) => __($issue['key'], [
+                    'source' => $issue['source'] === '' ? __('portal.validation_none') : $issue['source'],
+                    'translation' => $issue['translation'] === '' ? __('portal.validation_none') : $issue['translation'],
+                ]),
+                $issues
+            );
+
+            throw ValidationException::withMessages([
+                'text' => $messages,
+            ]);
+        }
+
         $translation = Translation::query()->firstOrNew([
             'translation_source_id' => $source->id,
             'locale_id' => (int) $data['target_locale'],
@@ -114,7 +138,7 @@ class TranslationController extends Controller
 
         $translation->fill([
             'updated_by' => $user->id,
-            'text' => trim($data['text']),
+            'text' => $text,
             'status' => 'approved',
         ])->save();
 
@@ -186,8 +210,39 @@ class TranslationController extends Controller
             ->orderBy('id')
             ->get();
 
-        $missing = $sources->filter(fn ($source) => trim((string) optional($source->translations->first())->text) === '');
-        abort_if($missing->isNotEmpty(), 422, 'A tradução ainda não está 100% concluída.');
+        $missing = [];
+        $invalid = [];
+
+        foreach ($sources as $source) {
+            $translation = $source->translations->first();
+            $text = trim((string) $translation?->text);
+
+            if ($text === '') {
+                $missing[] = $source->id;
+                continue;
+            }
+
+            $issues = $this->validator->validate($source->msgid, $text);
+
+            if ($issues !== []) {
+                $invalid[] = $source->id;
+            }
+        }
+
+        if ($missing !== [] || $invalid !== []) {
+            Log::warning('Exportação de tradução bloqueada por catálogo incompleto ou inválido.', [
+                'locale' => $locale->code,
+                'missing_count' => count($missing),
+                'invalid_count' => count($invalid),
+                'missing_source_ids' => array_slice($missing, 0, 20),
+                'invalid_source_ids' => array_slice($invalid, 0, 20),
+            ]);
+
+            abort(422, __('portal.export_validation_failed', [
+                'missing' => count($missing),
+                'invalid' => count($invalid),
+            ]));
+        }
 
         $filename = $locale->code.'.po';
 

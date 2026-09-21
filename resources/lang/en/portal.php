@@ -35,4 +35,11 @@ return [
     'registration_sent_title' => 'Check your email',
     'registration_sent' => 'We sent a confirmation link to :email.',
     'registration_expires' => 'The link expires in 30 minutes.',
+    'validation_named_placeholders' => 'Named placeholders must be preserved. Source: :source. Translation: :translation.',
+    'validation_printf_placeholders' => 'Formatting placeholders must be preserved. Source: :source. Translation: :translation.',
+    'validation_shortcuts' => 'Keyboard shortcuts after a tab must be preserved. Source: :source. Translation: :translation.',
+    'validation_newlines' => 'The number of line breaks must be preserved. Source: :source. Translation: :translation.',
+    'validation_accelerators' => 'The number of access-key markers (&) must be preserved. Source: :source. Translation: :translation.',
+    'validation_none' => 'none',
+    'export_validation_failed' => 'The file could not be generated: :missing terms are untranslated and :invalid translations have placeholders or structure incompatible with the source.',
 ];

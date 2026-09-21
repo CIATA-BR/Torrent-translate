@@ -35,4 +35,11 @@ return [
     'registration_sent_title' => 'Confira seu e-mail',
     'registration_sent' => 'Enviamos um link de confirmação para :email.',
     'registration_expires' => 'O link expira em 30 minutos.',
+    'validation_named_placeholders' => 'Os marcadores nomeados precisam ser preservados. Original: :source. Tradução: :translation.',
+    'validation_printf_placeholders' => 'Os marcadores de formatação precisam ser preservados. Original: :source. Tradução: :translation.',
+    'validation_shortcuts' => 'Os atalhos de teclado após tabulação precisam ser preservados. Original: :source. Tradução: :translation.',
+    'validation_newlines' => 'A quantidade de quebras de linha precisa ser preservada. Original: :source. Tradução: :translation.',
+    'validation_accelerators' => 'A quantidade de marcadores de tecla de acesso (&) precisa ser preservada. Original: :source. Tradução: :translation.',
+    'validation_none' => 'nenhum',
+    'export_validation_failed' => 'Não foi possível gerar o arquivo: :missing termos estão sem tradução e :invalid traduções possuem marcadores ou estrutura incompatíveis com o original.',
 ];
