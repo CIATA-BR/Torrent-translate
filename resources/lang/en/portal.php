@@ -62,6 +62,7 @@ return [
     'admin_progress' => 'Progress',
     'admin_approved' => 'Approved',
     'admin_pending_review' => 'Pending review',
+    'admin_rejected' => 'Rejected',
     'admin_invalid' => 'Invalid',
     'admin_action' => 'Action',
     'admin_publish' => 'Publish :locale',

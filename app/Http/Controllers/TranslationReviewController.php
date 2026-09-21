@@ -29,6 +29,8 @@ class TranslationReviewController extends Controller
 
     public function update(Request $request, Translation $translation)
     {
+        abort_unless($translation->status === 'pending_review', 409);
+
         $data = $request->validate([
             'text' => ['required', 'string'],
             'action' => ['required', 'in:approve,reject'],

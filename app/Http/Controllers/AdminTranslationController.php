@@ -57,6 +57,7 @@ class AdminTranslationController extends Controller
             $translated = 0;
             $approved = 0;
             $pendingReview = 0;
+            $rejected = 0;
             $invalid = 0;
 
             foreach ($sources as $source) {
@@ -71,8 +72,10 @@ class AdminTranslationController extends Controller
 
                 if ($translation?->status === 'approved') {
                     $approved++;
-                } else {
+                } elseif ($translation?->status === 'pending_review') {
                     $pendingReview++;
+                } elseif ($translation?->status === 'rejected') {
+                    $rejected++;
                 }
 
                 if ($this->validator->validate($source->msgid, $text) !== []) {
@@ -87,6 +90,7 @@ class AdminTranslationController extends Controller
                 'translated' => $translated,
                 'approved' => $approved,
                 'pending_review' => $pendingReview,
+                'rejected' => $rejected,
                 'total' => $total,
                 'percent' => $percent,
                 'invalid' => $invalid,

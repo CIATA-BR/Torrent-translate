@@ -46,6 +46,7 @@
 <th scope="col">{{ __('portal.admin_progress') }}</th>
 <th scope="col">{{ __('portal.admin_approved') }}</th>
 <th scope="col">{{ __('portal.admin_pending_review') }}</th>
+<th scope="col">{{ __('portal.admin_rejected') }}</th>
 <th scope="col">{{ __('portal.admin_invalid') }}</th>
 <th scope="col">{{ __('portal.admin_pr_status') }}</th>
 <th scope="col">{{ __('portal.admin_action') }}</th>
@@ -58,6 +59,7 @@
 <td>{{ $row['translated'] }} / {{ $row['total'] }} — {{ $row['percent'] }}%</td>
 <td>{{ $row['approved'] }}</td>
 <td>{{ $row['pending_review'] }}</td>
+<td>{{ $row['rejected'] }}</td>
 <td>{{ $row['invalid'] }}</td>
 <td>
 @if($row['pull_request'])
