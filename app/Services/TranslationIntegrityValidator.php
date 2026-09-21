@@ -109,7 +109,7 @@ class TranslationIntegrityValidator
 
     private function acceleratorCount(string $text): int
     {
-        preg_match_all('/(?<!&)&(?!&)/', $text, $matches);
+        preg_match_all('/(?<!&)&(?=\\S)(?!&)/u', $text, $matches);
 
         return count($matches[0] ?? []);
     }
