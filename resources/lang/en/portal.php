@@ -55,6 +55,7 @@ return [
     'admin_publish_base' => 'Publication base branch: :base.',
     'admin_sync' => 'Synchronize catalog now',
     'admin_sync_success' => 'Catalog synchronized successfully.',
+    'admin_sync_success_details' => 'Catalog synchronized: :total terms. New: :added. Reactivated: :reactivated. Deactivated: :deactivated.'
     'admin_sync_failed' => 'The catalog could not be synchronized. Check the server log.',
     'admin_languages' => 'Languages',
     'admin_locale' => 'Language',

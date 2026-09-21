@@ -55,6 +55,7 @@ return [
     'admin_publish_base' => 'Branch base para publicação: :base.',
     'admin_sync' => 'Sincronizar catálogo agora',
     'admin_sync_success' => 'Catálogo sincronizado com sucesso.',
+    'admin_sync_success_details' => 'Catálogo sincronizado: :total termos. Novos: :added. Reativados: :reactivated. Desativados: :deactivated.'
     'admin_sync_failed' => 'Não foi possível sincronizar o catálogo. Consulte o log do servidor.',
     'admin_languages' => 'Idiomas',
     'admin_locale' => 'Idioma',

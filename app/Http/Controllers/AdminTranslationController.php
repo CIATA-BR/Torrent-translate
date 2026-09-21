@@ -5,10 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Locale;
 use App\Models\TranslationSource;
 use App\Services\GitHubTranslationRepositoryService;
+use App\Services\TranslationCatalogSynchronizer;
 use App\Services\TranslationIntegrityValidator;
 use App\Services\TranslationPoService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Log;
 
 class AdminTranslationController extends Controller
@@ -16,7 +16,8 @@ class AdminTranslationController extends Controller
     public function __construct(
         protected TranslationIntegrityValidator $validator,
         protected TranslationPoService $po,
-        protected GitHubTranslationRepositoryService $github
+        protected GitHubTranslationRepositoryService $github,
+        protected TranslationCatalogSynchronizer $synchronizer
     ) {}
 
     public function index()
@@ -77,19 +78,7 @@ class AdminTranslationController extends Controller
 
         try {
             $pot = $this->github->fetchPot();
-            $path = resource_path('translation_catalog/serrebitorrent.pot');
-
-            if (! is_dir(dirname($path))) {
-                mkdir(dirname($path), 0775, true);
-            }
-
-            file_put_contents($path, $pot);
-
-            $exitCode = Artisan::call('translations:sync-pot', ['path' => $path]);
-
-            if ($exitCode !== 0) {
-                throw new \RuntimeException(trim(Artisan::output()) ?: 'Falha ao sincronizar o catálogo.');
-            }
+            $stats = $this->synchronizer->syncContents($pot);
         } catch (\Throwable $e) {
             Log::error('Falha ao sincronizar catálogo pelo painel administrativo.', [
                 'exception_class' => $e::class,
@@ -101,7 +90,12 @@ class AdminTranslationController extends Controller
             ]);
         }
 
-        return back()->with('status', __('portal.admin_sync_success'));
+        return back()->with('status', __('portal.admin_sync_success_details', [
+            'total' => $stats['total'],
+            'added' => $stats['added'],
+            'reactivated' => $stats['reactivated'],
+            'deactivated' => $stats['deactivated'],
+        ]));
     }
 
     public function publish(Request $request)
