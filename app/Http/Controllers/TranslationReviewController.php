@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Translation;
 use App\Models\TranslationRevision;
+use App\Services\AuditTrail;
 use App\Services\TranslationIntegrityValidator;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -11,7 +12,8 @@ use Illuminate\Validation\ValidationException;
 class TranslationReviewController extends Controller
 {
     public function __construct(
-        protected TranslationIntegrityValidator $validator
+        protected TranslationIntegrityValidator $validator,
+        protected AuditTrail $audit
     ) {}
 
     public function index()
@@ -72,6 +74,19 @@ class TranslationReviewController extends Controller
             'old_status' => $oldStatus,
             'new_status' => $newStatus,
         ]);
+
+        $this->audit->record(
+            $newStatus === 'approved' ? 'translation.approved' : 'translation.rejected',
+            $request->user(),
+            Translation::class,
+            $translation->id,
+            [
+                'source_id' => $translation->translation_source_id,
+                'locale_id' => $translation->locale_id,
+                'old_status' => $oldStatus,
+                'new_status' => $newStatus,
+            ]
+        );
 
         return back()->with(
             'status',

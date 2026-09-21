@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Locale;
 use App\Models\TranslationSource;
+use App\Services\AuditTrail;
 use App\Services\GitHubTranslationRepositoryService;
 use App\Services\TranslationCatalogSynchronizer;
 use App\Services\TranslationIntegrityValidator;
@@ -17,7 +18,8 @@ class AdminTranslationController extends Controller
         protected TranslationIntegrityValidator $validator,
         protected TranslationPoService $po,
         protected GitHubTranslationRepositoryService $github,
-        protected TranslationCatalogSynchronizer $synchronizer
+        protected TranslationCatalogSynchronizer $synchronizer,
+        protected AuditTrail $audit
     ) {}
 
     public function index()
@@ -126,6 +128,14 @@ class AdminTranslationController extends Controller
             ]);
         }
 
+        $this->audit->record(
+            'catalog.synced',
+            $request->user(),
+            null,
+            null,
+            $stats
+        );
+
         return back()->with('status', __('portal.admin_sync_success_details', [
             'total' => $stats['total'],
             'added' => $stats['added'],
@@ -164,6 +174,18 @@ class AdminTranslationController extends Controller
                 'github' => __('portal.admin_publish_failed', ['locale' => $locale->code]),
             ]);
         }
+
+        $this->audit->record(
+            $result['created'] ? 'catalog.pull_request_created' : 'catalog.pull_request_updated',
+            $request->user(),
+            Locale::class,
+            $locale->id,
+            [
+                'locale' => $locale->code,
+                'pull_request' => $result['number'],
+                'branch' => $result['branch'],
+            ]
+        );
 
         $message = $result['created']
             ? __('portal.admin_publish_success', ['locale' => $locale->code, 'number' => $result['number']])

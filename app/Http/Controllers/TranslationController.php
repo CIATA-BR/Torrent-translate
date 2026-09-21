@@ -6,6 +6,7 @@ use App\Models\Locale;
 use App\Models\Translation;
 use App\Models\TranslationRevision;
 use App\Models\TranslationSource;
+use App\Services\AuditTrail;
 use App\Services\TranslationIntegrityValidator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -15,7 +16,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class TranslationController extends Controller
 {
     public function __construct(
-        protected TranslationIntegrityValidator $validator
+        protected TranslationIntegrityValidator $validator,
+        protected AuditTrail $audit
     ) {}
 
     public function index(Request $request)
@@ -136,6 +138,19 @@ class TranslationController extends Controller
             'old_status' => $oldStatus,
             'new_status' => $translation->status,
         ]);
+
+        $this->audit->record(
+            'translation.submitted',
+            $user,
+            Translation::class,
+            $translation->id,
+            [
+                'source_id' => $source->id,
+                'locale_id' => (int) $data['target_locale'],
+                'old_status' => $oldStatus,
+                'new_status' => $translation->status,
+            ]
+        );
 
         $targetLocale = Locale::query()->findOrFail((int) $data['target_locale']);
         $metrics = $this->catalogMetrics($targetLocale);

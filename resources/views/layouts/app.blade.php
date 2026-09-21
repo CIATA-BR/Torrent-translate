@@ -22,6 +22,8 @@
 @if(auth()->check() && auth()->user()->isPortalAdmin())
 <span aria-hidden="true"> | </span>
 <a href="{{ route('admin.translations.index') }}">{{ __('portal.admin_link') }}</a>
+<span aria-hidden="true"> | </span>
+<a href="{{ route('admin.audit.index') }}">{{ __('portal.audit_link') }}</a>
 @endif
 @if(auth()->check())
 <span aria-hidden="true"> | </span>

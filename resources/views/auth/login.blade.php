@@ -9,5 +9,6 @@
 <div class="field"><label><input type="checkbox" name="remember" value="1"> {{ __('portal.remember') }}</label></div>
 <button type="submit">{{ __('portal.login') }}</button>
 </form>
+<p><a href="{{ route('password.request') }}">{{ __('portal.forgot_password') }}</a></p>
 <p><a href="{{ route('register.request') }}">{{ __('portal.create_account') }}</a></p>
 @endsection
