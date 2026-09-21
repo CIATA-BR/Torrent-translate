@@ -3,9 +3,9 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class User extends Authenticatable
 {
@@ -20,7 +20,7 @@ class User extends Authenticatable
         'password',
     ];
 
-    protected $hidden = ['password','remember_token'];
+    protected $hidden = ['password', 'remember_token'];
 
     protected function casts(): array
     {
@@ -33,5 +33,15 @@ class User extends Authenticatable
     public function locale(): BelongsTo
     {
         return $this->belongsTo(Locale::class);
+    }
+
+    public function isPortalAdmin(): bool
+    {
+        $email = strtolower(trim((string) $this->email));
+
+        return collect(config('torrent.admin_emails', []))
+            ->map(fn ($value) => strtolower(trim((string) $value)))
+            ->filter()
+            ->contains($email);
     }
 }

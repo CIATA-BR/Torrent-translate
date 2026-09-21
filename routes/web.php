@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Controllers\AdminTranslationController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\RegistrationController;
 use App\Http\Controllers\TranslationController;
+use App\Http\Middleware\RequirePortalAdmin;
 use App\Http\Middleware\SetPortalLocale;
 use Illuminate\Support\Facades\Route;
 
@@ -24,5 +26,11 @@ Route::middleware([SetPortalLocale::class])->group(function () {
         Route::get('/traducoes',[TranslationController::class,'index'])->name('translations.index');
         Route::post('/traducoes/{source}',[TranslationController::class,'store'])->name('translations.store');
         Route::get('/traducoes-exportar',[TranslationController::class,'export'])->name('translations.export');
+
+        Route::prefix('admin')->middleware(RequirePortalAdmin::class)->group(function () {
+            Route::get('/traducoes',[AdminTranslationController::class,'index'])->name('admin.translations.index');
+            Route::post('/traducoes/sincronizar',[AdminTranslationController::class,'sync'])->name('admin.translations.sync');
+            Route::post('/traducoes/publicar',[AdminTranslationController::class,'publish'])->name('admin.translations.publish');
+        });
     });
 });

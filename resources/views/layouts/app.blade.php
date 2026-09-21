@@ -15,6 +15,10 @@
 <a href="{{ request()->fullUrlWithQuery(['site_lang' => 'pt-BR']) }}" lang="pt-BR">{{ __('portal.portuguese') }}</a>
 <span aria-hidden="true"> | </span>
 <a href="{{ request()->fullUrlWithQuery(['site_lang' => 'en-US']) }}" lang="en">{{ __('portal.english') }}</a>
+@if(auth()->check() && auth()->user()->isPortalAdmin())
+<span aria-hidden="true"> | </span>
+<a href="{{ route('admin.translations.index') }}">{{ __('portal.admin_link') }}</a>
+@endif
 </nav>
 </div>
 </header>

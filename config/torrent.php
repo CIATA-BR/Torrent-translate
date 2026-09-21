@@ -1,6 +1,11 @@
 <?php
 
 return [
+    'admin_emails' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env('TORRENT_ADMIN_EMAILS', ''))
+    ))),
+
     'microsoft_graph' => [
         'tenant_id' => env('MICROSOFT_GRAPH_TENANT_ID'),
         'client_id' => env('MICROSOFT_GRAPH_CLIENT_ID'),
