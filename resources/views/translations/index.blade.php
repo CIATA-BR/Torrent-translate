@@ -31,6 +31,9 @@
 <select id="filter" name="filter">
 <option value="">{{ __('portal.all') }}</option>
 <option value="untranslated" @selected($filter === 'untranslated')>{{ __('portal.untranslated') }}</option>
+<option value="pending_review" @selected($filter === 'pending_review')>{{ __('portal.pending_review_filter') }}</option>
+<option value="rejected" @selected($filter === 'rejected')>{{ __('portal.rejected_filter') }}</option>
+<option value="approved" @selected($filter === 'approved')>{{ __('portal.approved_filter') }}</option>
 </select>
 </div>
 
@@ -38,7 +41,7 @@
 </form>
 
 <p id="translation-progress" role="status" aria-live="polite" aria-atomic="true">
-{{ __('portal.progress_with_validation', ['translated' => $translated, 'total' => $total, 'percent' => $percent, 'invalid' => $invalid]) }}
+{{ __('portal.progress_with_review', ['translated' => $translated, 'total' => $total, 'percent' => $percent, 'approved' => $approved, 'pending' => $pendingReview, 'rejected' => $rejected, 'invalid' => $invalid]) }}
 </p>
 
 @if($sourceLanguage === 'pt-BR' && $translated < $total)

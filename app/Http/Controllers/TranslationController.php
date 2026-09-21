@@ -62,6 +62,12 @@ class TranslationController extends Controller
                 ->where('locale_id', $targetLocale->id)
                 ->whereNotNull('text')
                 ->where('text', '<>', ''));
+        } elseif (in_array($filter, ['pending_review', 'rejected', 'approved'], true)) {
+            $available->whereHas('translations', fn ($q) => $q
+                ->where('locale_id', $targetLocale->id)
+                ->where('status', $filter)
+                ->whereNotNull('text')
+                ->where('text', '<>', ''));
         }
 
         $query = clone $available;
@@ -94,7 +100,7 @@ class TranslationController extends Controller
             'text' => ['required', 'string'],
             'target_locale' => ['required', 'exists:locales,id'],
             'source_lang' => ['required', 'in:en-US,pt-BR'],
-            'filter' => ['nullable', 'in:untranslated'],
+            'filter' => ['nullable', 'in:untranslated,pending_review,rejected,approved'],
             'q' => ['nullable', 'string', 'max:255'],
             'page' => ['nullable', 'integer', 'min:1'],
             'version' => ['nullable', 'string', 'max:64'],
@@ -185,10 +191,13 @@ class TranslationController extends Controller
 
         return redirect()
             ->route('translations.index', $query)
-            ->with('status', __('portal.progress_with_validation', [
+            ->with('status', __('portal.progress_with_review', [
                 'translated' => $metrics['translated'],
                 'total' => $metrics['total'],
                 'percent' => $metrics['percent'],
+                'approved' => $metrics['approved'],
+                'pending' => $metrics['pendingReview'],
+                'rejected' => $metrics['rejected'],
                 'invalid' => $metrics['invalid'],
             ]));
     }
@@ -272,6 +281,7 @@ class TranslationController extends Controller
         $translated = 0;
         $approved = 0;
         $pendingReview = 0;
+        $rejected = 0;
         $invalid = 0;
 
         foreach ($sources as $source) {
@@ -286,8 +296,10 @@ class TranslationController extends Controller
             $translation = $source->translations->first();
             if ($translation?->status === 'approved') {
                 $approved++;
-            } else {
+            } elseif ($translation?->status === 'pending_review') {
                 $pendingReview++;
+            } elseif ($translation?->status === 'rejected') {
+                $rejected++;
             }
 
             if ($this->validator->validate($source->msgid, $text) !== []) {
@@ -300,6 +312,7 @@ class TranslationController extends Controller
             'translated' => $translated,
             'approved' => $approved,
             'pendingReview' => $pendingReview,
+            'rejected' => $rejected,
             'invalid' => $invalid,
             'percent' => $total > 0 ? (int) floor(($translated / $total) * 100) : 0,
             'publishable' => $total > 0 && $approved === $total && $invalid === 0,
